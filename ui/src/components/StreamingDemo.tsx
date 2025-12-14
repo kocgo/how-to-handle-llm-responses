@@ -6,16 +6,17 @@ import React, {
   useDeferredValue,
   useEffect,
   useMemo,
+  memo,
 } from 'react'
 import { fetchStream } from '../utils/stream'
 import { MetricsPanel } from './MetricsPanel'
 import { MarkdownRenderer } from './MarkdownRenderer'
 import { PlainTextRenderer } from './PlainTextRenderer'
 import { HybridRenderer } from './HybridRenderer'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { useFps } from '../hooks/useFps'
 import { parseTaggedSegments, TaggedSegment } from '../utils/segments'
 import { Level, BatchStrategy, StreamChunk } from '../types'
-
 interface StreamingDemoProps {
   level: Level
   batchStrategy: BatchStrategy
@@ -24,7 +25,15 @@ interface StreamingDemoProps {
 }
 
 type HybridSegment = TaggedSegment & { key: string }
-type OutputTab = 'text' | 'markdown' | 'hybrid' | 'css-optimized' | 'css-markdown'
+type OutputTab =
+  | 'text'
+  | 'markdown'
+  | 'hybrid'
+  | 'css-optimized'
+  | 'css-markdown'
+  | 'virtual-markdown'
+  | 'virtual-hybrid'
+  | 'virtual-hybrid-animation'
 
 const MAX_FPS_HISTORY = 120
 // Chunk size for CSS-optimized rendering (chars per chunk)
@@ -41,6 +50,7 @@ export function StreamingDemo({
   const deferredText = useDeferredValue(text)
   const isStale = text !== deferredText
   const displayText = shouldUseDeferredValue ? deferredText : text
+  const hasStarted = displayText.length > 0
   const currentFps = useFps()
   const [fpsHistory, setFpsHistory] = useState<number[]>([])
   const [elapsedMs, setElapsedMs] = useState(0)
@@ -50,6 +60,11 @@ export function StreamingDemo({
   const [delay, setDelay] = useState(1)
   const [inputValue, setInputValue] = useState('')
   const [outputTab, setOutputTab] = useState<OutputTab>('hybrid')
+  const [useAnimatedOutput, setUseAnimatedOutput] = useState(false)
+  const isVirtualTab =
+    outputTab === 'virtual-markdown' ||
+    outputTab === 'virtual-hybrid' ||
+    outputTab === 'virtual-hybrid-animation'
 
   const abortControllerRef = useRef<AbortController | null>(null)
   const bufferRef = useRef('')
@@ -57,13 +72,59 @@ export function StreamingDemo({
   const outputContentRef = useRef<HTMLDivElement>(null)
   const timerStartRef = useRef<number | null>(null)
   const timerRafRef = useRef<number>()
+  const scrollAnimationRef = useRef<number>()
 
-  // Auto-scroll
+  // Auto-scroll with easing
   useEffect(() => {
     const container = outputContentRef.current
     if (!container) return
-    container.scrollTop = container.scrollHeight
-  }, [displayText])
+
+    if (scrollAnimationRef.current) {
+      cancelAnimationFrame(scrollAnimationRef.current)
+      scrollAnimationRef.current = undefined
+    }
+
+    const start = container.scrollTop
+    const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight)
+    const distance = maxScrollTop - start
+
+    if (Math.abs(distance) < 4) {
+      container.scrollTop = maxScrollTop
+      return
+    }
+
+    if (isVirtualTab) {
+      container.scrollTop = maxScrollTop
+      return
+    }
+
+    const duration = 320
+    const startTime = performance.now()
+
+    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3)
+
+    const animate = () => {
+      const now = performance.now()
+      const progress = Math.min(1, (now - startTime) / duration)
+      const eased = easeOutCubic(progress)
+      container.scrollTop = start + distance * eased
+
+      if (progress < 1) {
+        scrollAnimationRef.current = requestAnimationFrame(animate)
+      } else {
+        scrollAnimationRef.current = undefined
+      }
+    }
+
+    scrollAnimationRef.current = requestAnimationFrame(animate)
+
+    return () => {
+      if (scrollAnimationRef.current) {
+        cancelAnimationFrame(scrollAnimationRef.current)
+        scrollAnimationRef.current = undefined
+      }
+    }
+  }, [displayText, isVirtualTab])
 
   useEffect(() => {
     if (!isStreaming) return
@@ -221,6 +282,22 @@ export function StreamingDemo({
     [mergeSegments, segmentsWithOffsets]
   )
 
+  const isCssOptimizedTab =
+    outputTab === 'css-optimized' ||
+    outputTab === 'css-markdown' ||
+    outputTab === 'virtual-markdown' ||
+    outputTab === 'virtual-hybrid' ||
+    outputTab === 'virtual-hybrid-animation'
+
+  const isAnimationTab = outputTab === 'virtual-hybrid-animation'
+
+  const cssOptimizedLabel =
+    outputTab === 'css-markdown' || outputTab === 'virtual-markdown'
+      ? 'Markdown Only'
+      : isAnimationTab
+        ? 'Hybrid + Animation'
+        : 'Hybrid'
+
   // CSS-optimized chunked rendering
   // Splits content into chunks that can benefit from content-visibility: auto
   const cssOptimizedChunks = useMemo(() => {
@@ -256,6 +333,21 @@ export function StreamingDemo({
     }
     return result
   }, [displayText])
+
+  const getScrollElement = useCallback(() => outputContentRef.current, [])
+  const estimateSize = useCallback(() => 320, [])
+  const getItemKey = useCallback(
+    (index: number) => cssOptimizedChunks[index]?.id ?? index,
+    [cssOptimizedChunks]
+  )
+
+  const virtualizer = useVirtualizer({
+    count: cssOptimizedChunks.length,
+    getScrollElement,
+    estimateSize,
+    overscan: 12,
+    getItemKey,
+  })
 
   // Determine which state indicators to show
   const showIsPending = shouldUseTransition
@@ -339,14 +431,10 @@ export function StreamingDemo({
         elapsedMs={elapsedMs}
       />
 
-      {(outputTab === 'css-optimized' || outputTab === 'css-markdown') && displayText && (
+      {isCssOptimizedTab && displayText && (
         <div className="css-optimized-indicator">
           <span>
-            CSS Optimized (
-            {outputTab === 'css-markdown'
-              ? 'Markdown Only'
-              : 'Hybrid'}
-            ): {' '}
+            CSS Optimized ({cssOptimizedLabel}):{' '}
             {cssOptimizedChunks.length.toLocaleString()} chunks
           </span>
           <span className="chunk-info">
@@ -392,43 +480,118 @@ export function StreamingDemo({
             >
               Hybrid (With CSS optimization)
             </button>
+            <button
+              className={`output-tab ${outputTab === 'virtual-markdown' ? 'active' : ''}`}
+              onClick={() => setOutputTab('virtual-markdown')}
+            >
+              @tanstack/react-virtual + Markdown Only
+            </button>
+            <button
+              className={`output-tab ${outputTab === 'virtual-hybrid' ? 'active' : ''}`}
+              onClick={() => setOutputTab('virtual-hybrid')}
+            >
+              @tanstack/react-virtual + Hybrid
+            </button>
+            <button
+              className={`output-tab ${
+                outputTab === 'virtual-hybrid-animation' ? 'active' : ''
+              }`}
+              onClick={() => setOutputTab('virtual-hybrid-animation')}
+            >
+              virtual + hybrid + animation
+            </button>
           </div>
-          <div className="output-badges">
-            {showIsPending && isPending && (
-              <span className="output-badge pending-badge">Pending...</span>
-            )}
-            {showIsStale && isStale && (
-              <span className="output-badge stale-badge">Catching up...</span>
-            )}
+          <div className="output-actions">
+            <label className="animate-toggle">
+              <input
+                type="checkbox"
+                checked={useAnimatedOutput}
+                onChange={(e) => setUseAnimatedOutput(e.target.checked)}
+              />
+              Animated text
+            </label>
+            <div className="output-badges">
+              {showIsPending && isPending && (
+                <span className="output-badge pending-badge">Pending...</span>
+              )}
+              {showIsStale && isStale && (
+                <span className="output-badge stale-badge">Catching up...</span>
+              )}
+            </div>
           </div>
         </div>
         <div
           ref={outputContentRef}
           className="output-content chat-scroller"
         >
-          {displayText ? (
+          {hasStarted ? (
             outputTab === 'css-optimized' || outputTab === 'css-markdown' ? (
               <div className="css-optimized-output">
                 {cssOptimizedChunks.map((chunk) => (
-                  <CssOptimizedChunk
+                  <MemoizedCssOptimizedChunk
                     key={chunk.id}
                     segments={chunk.segments}
                     content={chunk.content}
                     mode={outputTab === 'css-markdown' ? 'markdown' : 'hybrid'}
+                    animateWords={useAnimatedOutput}
                   />
                 ))}
               </div>
+            ) : outputTab === 'virtual-markdown' || outputTab === 'virtual-hybrid' || outputTab === 'virtual-hybrid-animation' ? (
+              <div className="css-optimized-output" style={{ height: '100%' }}>
+                <div
+                  style={{
+                    height: virtualizer.getTotalSize(),
+                    position: 'relative',
+                    width: '100%',
+                  }}
+                >
+                  {virtualizer.getVirtualItems().map((item) => {
+                    const chunk = cssOptimizedChunks[item.index]
+                    if (!chunk) return null
+                    const isLastChunk = item.index === cssOptimizedChunks.length - 1
+                    const shouldAnimateChunk = isAnimationTab && isLastChunk
+                    const animateWords = useAnimatedOutput || shouldAnimateChunk
+                    return (
+                      <div
+                        key={chunk.id}
+                        className="css-optimized-chunk"
+                        style={{
+                          position: 'absolute',
+                          top: item.start,
+                          left: 0,
+                          right: 0,
+                          height: item.size,
+                        }}
+                      >
+                        <MemoizedCssOptimizedChunk
+                          segments={chunk.segments}
+                          content={chunk.content}
+                          mode={outputTab === 'virtual-markdown' ? 'markdown' : 'hybrid'}
+                          showCursor={shouldAnimateChunk}
+                          animate={shouldAnimateChunk}
+                          animateWords={animateWords}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             ) : outputTab === 'markdown' ? (
               <div className="llm-chunk llmChunk llm-chunk--markdown llmChunk--markdown">
-                <MarkdownRenderer content={displayText} />
+                <MarkdownRenderer content={displayText} animateText={useAnimatedOutput} />
               </div>
             ) : outputTab === 'hybrid' ? (
               <div className="hybrid-output">
-                <HybridRenderer segments={mergedHybridSegments} content={displayText} />
+                <HybridRenderer
+                  segments={mergedHybridSegments}
+                  content={displayText}
+                  animateWords={useAnimatedOutput}
+                />
               </div>
             ) : (
               <div className="llm-chunk llmChunk llm-chunk--text llmChunk--text">
-                <PlainTextRenderer content={displayText} />
+                <PlainTextRenderer content={displayText} animateWords={useAnimatedOutput} />
               </div>
             )
           ) : (
@@ -448,9 +611,19 @@ interface CssOptimizedChunkProps {
   segments: HybridSegment[]
   content: string
   mode?: 'hybrid' | 'markdown'
+  showCursor?: boolean
+  animate?: boolean
+  animateWords?: boolean
 }
 
-function CssOptimizedChunk({ segments, content, mode = 'hybrid' }: CssOptimizedChunkProps) {
+function CssOptimizedChunk({
+  segments,
+  content,
+  mode = 'hybrid',
+  showCursor = false,
+  animate = false,
+  animateWords = false,
+}: CssOptimizedChunkProps) {
   const chunkRef = useRef<HTMLDivElement>(null)
   const [isVisible, setIsVisible] = useState(false)
 
@@ -477,19 +650,31 @@ function CssOptimizedChunk({ segments, content, mode = 'hybrid' }: CssOptimizedC
     }
   }, [])
 
+  const chunkClassName = [
+    'css-optimized-chunk',
+    animate ? 'typing-chunk' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return (
     <div
       ref={chunkRef}
-      className="css-optimized-chunk"
+      className={chunkClassName}
       data-visible={isVisible}
     >
       {mode === 'markdown' ? (
         <div className="llm-chunk llmChunk llm-chunk--markdown llmChunk--markdown">
-          <MarkdownRenderer content={content} />
+          <MarkdownRenderer content={content} animateText={animateWords} />
         </div>
       ) : (
-        <HybridRenderer segments={segments} content={content} />
+        <HybridRenderer
+          segments={segments}
+          content={content}
+          animateWords={animateWords}
+        />
       )}
+      {showCursor && <span className="typing-cursor" aria-hidden="true" />}
     </div>
   )
 }
@@ -498,3 +683,5 @@ function CssOptimizedChunk({ segments, content, mode = 'hybrid' }: CssOptimizedC
 interface ContentVisibilityAutoStateChangeEvent extends Event {
   skipped: boolean
 }
+
+const MemoizedCssOptimizedChunk = memo(CssOptimizedChunk)

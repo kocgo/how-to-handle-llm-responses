@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useCallback } from 'react'
 import { PlainTextRenderer } from './PlainTextRenderer'
 import { MarkdownRenderer } from './MarkdownRenderer'
 import { parseTaggedSegments, TaggedSegment } from '../utils/segments'
@@ -6,25 +6,14 @@ import { parseTaggedSegments, TaggedSegment } from '../utils/segments'
 interface HybridRendererProps {
   content?: string
   segments?: (TaggedSegment & { key?: string })[]
+  animateWords?: boolean
 }
 
-function renderSegmentContent(segment: TaggedSegment) {
-  if (segment.type === 'markdown') {
-    return <MarkdownRenderer content={segment.content} />
-  }
-
-  if (segment.type === 'tool') {
-    return (
-      <pre className="plain-text-output tool-output" aria-label="Tool call">
-        {segment.content}
-      </pre>
-    )
-  }
-
-  return <PlainTextRenderer content={segment.content} className="hybrid-text-block" />
-}
-
-export function HybridRenderer({ content = '', segments }: HybridRendererProps) {
+export function HybridRenderer({
+  content = '',
+  segments,
+  animateWords = false,
+}: HybridRendererProps) {
   const computedSegments = useMemo((): (TaggedSegment & { key?: string })[] => {
     if (segments) {
       return segments
@@ -38,10 +27,35 @@ export function HybridRenderer({ content = '', segments }: HybridRendererProps) 
   if (!computedSegments.length && content) {
     return (
       <div className="llm-chunk llmChunk llm-chunk--text llmChunk--text">
-        <PlainTextRenderer content={content} />
+        <PlainTextRenderer content={content} animateWords={animateWords} />
       </div>
     )
   }
+
+  const renderSegmentContent = useCallback(
+    (segment: TaggedSegment) => {
+      if (segment.type === 'markdown') {
+        return <MarkdownRenderer content={segment.content} animateText={animateWords} />
+      }
+
+      if (segment.type === 'tool') {
+        return (
+          <pre className="plain-text-output tool-output" aria-label="Tool call">
+            {segment.content}
+          </pre>
+        )
+      }
+
+      return (
+        <PlainTextRenderer
+          content={segment.content}
+          className="hybrid-text-block"
+          animateWords={animateWords}
+        />
+      )
+    },
+    [animateWords]
+  )
 
   return (
     <>

@@ -2,12 +2,16 @@ import React, { memo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { useAnimatedText } from '../hooks/useAnimatedText'
 
 interface MarkdownRendererProps {
   content: string
+  animateText?: boolean
 }
 
-function MarkdownRendererInner({ content }: MarkdownRendererProps) {
+function MarkdownRendererInner({ content, animateText = false }: MarkdownRendererProps) {
+  const animatedContent = animateText ? useAnimatedText(content, true) : content
+
   return (
     <ReactMarkdown
       components={{
@@ -31,7 +35,7 @@ function MarkdownRendererInner({ content }: MarkdownRendererProps) {
         },
       }}
     >
-      {content}
+      {animatedContent}
     </ReactMarkdown>
   )
 }

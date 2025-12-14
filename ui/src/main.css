@@ -500,6 +500,24 @@ section blockquote {
   gap: 0.25rem;
 }
 
+.output-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.animate-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: #cbd5e1;
+}
+
+.animate-toggle input {
+  accent-color: #f472b6;
+}
+
 .output-tab {
   padding: 0.4rem 0.75rem;
   background: transparent;
@@ -600,6 +618,7 @@ section blockquote {
   margin-bottom: 0.5rem;
   padding: 0.5rem 0;
   border-bottom: 1px solid rgba(168, 85, 247, 0.15);
+  will-change: transform, opacity;
 }
 
 .css-optimized-chunk:last-child {
@@ -655,6 +674,63 @@ section blockquote {
 .llm-chunk:last-child,
 .llmChunk:last-child {
   margin-bottom: 0;
+}
+
+.typing-chunk {
+  position: relative;
+}
+
+.word-animated {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.word-animated--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.typing-cursor {
+  display: inline-block;
+  width: 10px;
+  height: 1.1em;
+  margin-left: 4px;
+  background-color: #f8fafc;
+  border-radius: 2px;
+  animation: typing-cursor-blink 1s steps(2, start) infinite;
+  vertical-align: text-bottom;
+  box-shadow: 0 0 8px rgba(248, 250, 252, 0.4);
+}
+
+@keyframes typing-cursor-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.word-fade {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(6px);
+  animation: word-fade-in 0.65s ease forwards;
+}
+
+@keyframes word-fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .chat-scroller {
