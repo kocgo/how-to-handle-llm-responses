@@ -2,7 +2,8 @@ export type BatchStrategy = 'none' | 'raf' | 'interval'
 export type Level = 1 | 2 | 3 | 4 | 5 | 6
 
 export interface StreamChunk {
-  token: string
+  content: string
+  format: 'text' | 'markdown'
 }
 
 export interface PerformanceMetrics {

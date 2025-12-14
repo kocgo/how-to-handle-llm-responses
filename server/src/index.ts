@@ -4,61 +4,72 @@ import { URL } from 'node:url'
 const PORT = Number(process.env.PORT || 3001)
 const HOST = process.env.HOST || '0.0.0.0'
 
-// Word list for simulating LLM output
-const PROSE_WORDS = [
-  'The', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-  'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should',
-  'may', 'might', 'must', 'shall', 'can', 'need', 'dare', 'ought', 'used', 'to',
-  'and', 'but', 'or', 'nor', 'for', 'yet', 'so', 'although', 'because', 'since',
-  'unless', 'while', 'where', 'when', 'which', 'who', 'whom', 'whose', 'that', 'this',
-  'these', 'those', 'I', 'you', 'he', 'she', 'it', 'we', 'they', 'me',
-  'him', 'her', 'us', 'them', 'my', 'your', 'his', 'its', 'our', 'their',
-  'mine', 'yours', 'hers', 'ours', 'theirs', 'what', 'which', 'who', 'whom', 'whose',
-  'data', 'function', 'component', 'state', 'props', 'render', 'effect', 'hook',
-  'React', 'TypeScript', 'JavaScript', 'async', 'await', 'promise', 'callback',
-  'streaming', 'response', 'request', 'API', 'endpoint', 'server', 'client',
-  'performance', 'optimization', 'batching', 'transition', 'deferred', 'value',
-  'user', 'interface', 'experience', 'responsive', 'interactive', 'smooth',
-  'example', 'implementation', 'pattern', 'approach', 'solution', 'problem',
-]
+type ChunkFormat = 'text' | 'markdown'
 
-const MARKDOWN_SYNTAX = [
-  '# ', '## ', '### ', '**', '*', '- ', '1. ', '> ', '`', '```',
-  '[link]', '(url)', '![image]', '---', '|', '\n', '\n\n',
-]
-
-const CODE_TOKENS = [
-  'const', 'let', 'var', 'function', 'return', '=>', 'async', 'await',
-  'import', 'export', 'default', 'from', 'if', 'else', 'for', 'while',
-  'switch', 'case', 'break', 'continue', 'try', 'catch', 'finally', 'throw',
-  'new', 'this', 'class', 'extends', 'super', 'static', 'get', 'set',
-  'typeof', 'instanceof', 'in', 'of', 'delete', 'void', 'null', 'undefined',
-  'true', 'false', 'NaN', 'Infinity', 'console.log', 'useState', 'useEffect',
-  'useRef', 'useCallback', 'useMemo', 'useTransition', 'useDeferredValue',
-  '()', '{}', '[]', ';', ':', ',', '.', '=', '===', '!==', '&&', '||',
-]
-
-const PUNCTUATION = ['.', ',', '!', '?', ':', ';', '-', '...', '(', ')', '"', "'"]
-
-function getRandomElement<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)]
+interface StreamPayload {
+  content: string
+  format: ChunkFormat
 }
 
-function generateToken(): string {
-  const rand = Math.random()
-  if (rand < 0.5) {
-    return getRandomElement(PROSE_WORDS)
-  } else if (rand < 0.7) {
-    return getRandomElement(CODE_TOKENS)
-  } else if (rand < 0.85) {
-    return getRandomElement(MARKDOWN_SYNTAX)
-  } else {
-    return getRandomElement(PUNCTUATION)
-  }
-}
+const BASE_SECTIONS: StreamPayload[] = [
+  {
+    format: 'text',
+    content:
+      'Here is a mixed response that combines short narrative explanations with rich formatting. The server intentionally emits plain sentences alongside markdown so the UI can exercise different renderers.',
+  },
+  {
+    format: 'markdown',
+    content: `## Quick takeaways\n- Streaming content can include **inline emphasis** and bullet points.\n- Mixing plain text with markdown is common for LLMs.\n- Clients need to stitch chunks together without losing formatting.\n`,
+  },
+  {
+    format: 'text',
+    content:
+      'To mimic how an assistant might pivot, the payload also sprinkles in code commentary before dropping a fenced block.',
+  },
+  {
+    format: 'markdown',
+    content: '```ts\nexport async function fetchData() {\n  return Promise.resolve("example payload")\n}\n```\n',
+  },
+  {
+    format: 'text',
+    content:
+      'The stream finishes with a short recap and an invitation to adjust settings like token count and delay for stress testing.',
+  },
+]
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function expandSections(words: number): StreamPayload[] {
+  const tokens: StreamPayload[] = []
+  let iteration = 1
+
+  while (tokens.length < words) {
+    for (const section of BASE_SECTIONS) {
+      const decoratedContent =
+        iteration === 1
+          ? section.content
+          : `${section.content} (pass ${iteration})`
+
+      const parts = decoratedContent.split(/(\s+)/).filter(part => part.length > 0)
+
+      for (const part of parts) {
+        tokens.push({
+          content: part,
+          format: section.format,
+        })
+
+        if (tokens.length >= words) {
+          return tokens
+        }
+      }
+    }
+
+    iteration += 1
+  }
+
+  return tokens
 }
 
 const server = http.createServer(async (req, res) => {
@@ -101,10 +112,11 @@ const server = http.createServer(async (req, res) => {
     aborted = true
   })
 
+  const payloads = expandSections(words)
+
   // Stream tokens
-  for (let i = 0; i < words && !aborted; i++) {
-    const token = generateToken()
-    const data = JSON.stringify({ token })
+  for (let i = 0; i < payloads.length && !aborted; i++) {
+    const data = JSON.stringify(payloads[i])
     res.write(`data: ${data}\n\n`)
 
     // Small delay between tokens

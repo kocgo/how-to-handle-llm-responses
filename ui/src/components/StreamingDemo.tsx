@@ -10,7 +10,7 @@ import React, {
 import { fetchStream } from '../utils/stream'
 import { MetricsPanel } from './MetricsPanel'
 import { MarkdownRenderer } from './MarkdownRenderer'
-import { Level, BatchStrategy } from '../types'
+import { Level, BatchStrategy, StreamChunk } from '../types'
 
 interface StreamingDemoProps {
   level: Level
@@ -19,6 +19,8 @@ interface StreamingDemoProps {
   useDeferredValue: boolean
   useWindowing?: boolean
 }
+
+type HybridSegment = StreamChunk & { start?: number; end?: number; key?: string }
 
 const WINDOW_SIZE = 4000 // Characters to render at a time
 const WINDOW_BUFFER = 1000 // Extra buffer above/below
@@ -41,18 +43,22 @@ export function StreamingDemo({
   const [wordCount, setWordCount] = useState(300000)
   const [delay, setDelay] = useState(1)
   const [inputValue, setInputValue] = useState('')
-  const [outputTab, setOutputTab] = useState<'text' | 'markdown'>('markdown')
+  const [outputTab, setOutputTab] = useState<'text' | 'markdown' | 'hybrid'>('hybrid')
   const [scrollTop, setScrollTop] = useState(0)
+  const [segments, setSegments] = useState<StreamChunk[]>([])
 
   const abortControllerRef = useRef<AbortController | null>(null)
   const bufferRef = useRef('')
+  const segmentBufferRef = useRef<StreamChunk[]>([])
   const rafIdRef = useRef<number>()
   const outputContentRef = useRef<HTMLDivElement>(null)
 
   const handleReset = useCallback(() => {
     setText('')
     bufferRef.current = ''
+    segmentBufferRef.current = []
     setScrollTop(0)
+    setSegments([])
   }, [])
 
   const handleStop = useCallback(() => {
@@ -83,18 +89,21 @@ export function StreamingDemo({
       }
     }
 
-    const onChunk = (token: string) => {
+    const onChunk = (chunk: StreamChunk) => {
       if (batchStrategy === 'none') {
         // Level 1: Naive - setState on every chunk
-        setText((prev) => prev + token)
+        setText((prev) => prev + chunk.content)
+        setSegments((prev) => [...prev, chunk])
       } else if (batchStrategy === 'raf') {
         // Levels 2-6: Batch with requestAnimationFrame
-        bufferRef.current += token
+        bufferRef.current += chunk.content
+        segmentBufferRef.current.push(chunk)
 
         if (!rafIdRef.current) {
           rafIdRef.current = requestAnimationFrame(() => {
             const snapshot = bufferRef.current
             updateText(snapshot)
+            setSegments([...segmentBufferRef.current])
             rafIdRef.current = undefined
           })
         }
@@ -105,6 +114,7 @@ export function StreamingDemo({
       // Flush any remaining buffer
       if (batchStrategy !== 'none' && bufferRef.current) {
         updateText(bufferRef.current)
+        setSegments([...segmentBufferRef.current])
       }
       setIsStreaming(false)
     }
@@ -156,6 +166,75 @@ export function StreamingDemo({
     }
   }, [displayText, scrollTop, useWindowing])
 
+  const segmentsWithOffsets = useMemo(() => {
+    let cursor = 0
+
+    return segments.map((segment, index) => {
+      const start = cursor
+      const end = cursor + segment.content.length
+      cursor = end
+
+      return {
+        ...segment,
+        start,
+        end,
+        key: `${segment.format}-${index}-${start}`,
+      }
+    })
+  }, [segments])
+
+  const mergeSegments = useCallback((items: HybridSegment[]) => {
+    return items.reduce<HybridSegment[]>((acc, segment) => {
+      if (!segment.content) {
+        return acc
+      }
+
+      const last = acc[acc.length - 1]
+
+      if (last && last.format === segment.format) {
+        acc[acc.length - 1] = {
+          ...last,
+          content: `${last.content}${segment.content}`,
+          start: last.start ?? segment.start,
+          end: segment.end ?? last.end,
+        }
+      } else {
+        acc.push({ ...segment })
+      }
+
+      return acc
+    }, [])
+  }, [])
+
+  const slicedHybridSegments = useMemo(() => {
+    if (!useWindowing) {
+      return segmentsWithOffsets
+    }
+
+    return segmentsWithOffsets
+      .filter((segment) => segment.end !== undefined && segment.start !== undefined)
+      .filter((segment) => segment.end! > windowStart && segment.start! < windowEnd)
+      .map((segment) => {
+        const sliceStart = Math.max(0, windowStart - (segment.start ?? 0))
+        const sliceEnd = Math.min(segment.content.length, windowEnd - (segment.start ?? 0))
+
+        return {
+          ...segment,
+          content: segment.content.slice(sliceStart, sliceEnd),
+        }
+      })
+  }, [segmentsWithOffsets, useWindowing, windowEnd, windowStart])
+
+  const mergedHybridSegments = useMemo(
+    () => mergeSegments(segmentsWithOffsets),
+    [mergeSegments, segmentsWithOffsets]
+  )
+
+  const windowedHybridSegments = useMemo(
+    () => mergeSegments(slicedHybridSegments),
+    [mergeSegments, slicedHybridSegments]
+  )
+
   const handleScroll = useCallback(
     (e: React.UIEvent<HTMLDivElement>) => {
       if (useWindowing) {
@@ -168,6 +247,17 @@ export function StreamingDemo({
   // Determine which state indicators to show
   const showIsPending = shouldUseTransition
   const showIsStale = shouldUseDeferredValue
+
+  const renderHybridSegments = (items: HybridSegment[]) =>
+    items.map((segment, index) =>
+      segment.format === 'markdown' ? (
+        <MarkdownRenderer key={`md-${index}-${segment.start ?? 'start'}`} content={segment.content} />
+      ) : (
+        <pre className="plain-text-output hybrid-text-block" key={`text-${index}-${segment.start ?? 'start'}`}>
+          {segment.content}
+        </pre>
+      )
+    )
 
   return (
     <div className="streaming-demo">
@@ -273,6 +363,12 @@ export function StreamingDemo({
             >
               Markdown (Heavy)
             </button>
+            <button
+              className={`output-tab ${outputTab === 'hybrid' ? 'active' : ''}`}
+              onClick={() => setOutputTab('hybrid')}
+            >
+              Hybrid
+            </button>
           </div>
           <div className="output-badges">
             {useWindowing && (
@@ -305,6 +401,8 @@ export function StreamingDemo({
                 >
                   {outputTab === 'markdown' ? (
                     <MarkdownRenderer content={windowedText} />
+                  ) : outputTab === 'hybrid' ? (
+                    renderHybridSegments(windowedHybridSegments)
                   ) : (
                     <pre className="plain-text-output">{windowedText}</pre>
                   )}
@@ -312,6 +410,8 @@ export function StreamingDemo({
               </div>
             ) : outputTab === 'markdown' ? (
               <MarkdownRenderer content={displayText} />
+            ) : outputTab === 'hybrid' ? (
+              <div className="hybrid-output">{renderHybridSegments(mergedHybridSegments)}</div>
             ) : (
               <pre className="plain-text-output">{displayText}</pre>
             )

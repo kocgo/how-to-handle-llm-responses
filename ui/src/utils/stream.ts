@@ -4,7 +4,7 @@ interface FetchStreamOptions {
   words?: number
   delay?: number
   signal?: AbortSignal
-  onChunk: (token: string) => void
+  onChunk: (chunk: StreamChunk) => void
   onDone: () => void
   onError: (error: Error) => void
 }
@@ -58,7 +58,7 @@ export async function fetchStream({
 
           try {
             const chunk: StreamChunk = JSON.parse(data)
-            onChunk(chunk.token)
+            onChunk(chunk)
           } catch {
             // Skip invalid JSON
           }
@@ -74,7 +74,7 @@ export async function fetchStream({
       } else {
         try {
           const chunk: StreamChunk = JSON.parse(data)
-          onChunk(chunk.token)
+          onChunk(chunk)
         } catch {
           // Skip invalid JSON
         }
