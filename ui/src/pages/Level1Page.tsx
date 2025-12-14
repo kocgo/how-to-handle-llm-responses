@@ -72,10 +72,6 @@ export function Level1Page() {
 
       <section className="demo-section">
         <h2>Live Demo</h2>
-        <p className="demo-instruction">
-          Try typing in the input field while streaming to feel the lag. Watch
-          the FPS counter and render count.
-        </p>
         <StreamingDemo
           level={1}
           batchStrategy="none"

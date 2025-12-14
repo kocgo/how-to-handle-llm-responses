@@ -21,23 +21,20 @@ interface StreamingDemoProps {
   batchStrategy: BatchStrategy
   useTransition: boolean
   useDeferredValue: boolean
-  useWindowing?: boolean
 }
 
 type HybridSegment = TaggedSegment & { key: string }
+type OutputTab = 'text' | 'markdown' | 'hybrid' | 'css-optimized' | 'css-markdown'
 
-const WINDOW_SIZE = 4000 // Characters to render at a time
-const WINDOW_BUFFER = 1000 // Extra buffer above/below
-const LINE_HEIGHT = 24 // Approximate line height in pixels
-const CHARS_PER_LINE = 80 // Approximate characters per line
 const MAX_FPS_HISTORY = 120
+// Chunk size for CSS-optimized rendering (chars per chunk)
+const CSS_CHUNK_SIZE = 2000
 
 export function StreamingDemo({
   level,
   batchStrategy,
   useTransition: shouldUseTransition,
   useDeferredValue: shouldUseDeferredValue,
-  useWindowing = false,
 }: StreamingDemoProps) {
   const [text, setText] = useState('')
   const [isPending, startTransition] = useTransition()
@@ -52,8 +49,7 @@ export function StreamingDemo({
   const [wordCount, setWordCount] = useState(1000000)
   const [delay, setDelay] = useState(1)
   const [inputValue, setInputValue] = useState('')
-  const [outputTab, setOutputTab] = useState<'text' | 'markdown' | 'hybrid'>('hybrid')
-  const [scrollTop, setScrollTop] = useState(0)
+  const [outputTab, setOutputTab] = useState<OutputTab>('hybrid')
 
   const abortControllerRef = useRef<AbortController | null>(null)
   const bufferRef = useRef('')
@@ -62,22 +58,15 @@ export function StreamingDemo({
   const timerStartRef = useRef<number | null>(null)
   const timerRafRef = useRef<number>()
 
+  // Auto-scroll
   useEffect(() => {
     const container = outputContentRef.current
-    if (!container) {
-      return
-    }
-
+    if (!container) return
     container.scrollTop = container.scrollHeight
-    if (useWindowing) {
-      setScrollTop(container.scrollTop)
-    }
-  }, [displayText, useWindowing])
+  }, [displayText])
 
   useEffect(() => {
-    if (!isStreaming) {
-      return
-    }
+    if (!isStreaming) return
     setFpsHistory((prev) => {
       const next = [...prev, currentFps]
       if (next.length > MAX_FPS_HISTORY) {
@@ -90,7 +79,6 @@ export function StreamingDemo({
   const handleReset = useCallback(() => {
     setText('')
     bufferRef.current = ''
-    setScrollTop(0)
     setFpsHistory([])
     setElapsedMs(0)
     if (timerRafRef.current) {
@@ -130,10 +118,8 @@ export function StreamingDemo({
 
     const onChunk = (chunk: StreamChunk) => {
       if (batchStrategy === 'none') {
-        // Level 1: Naive - setState on every chunk
         setText((prev) => prev + chunk.content)
       } else if (batchStrategy === 'raf') {
-        // Levels 2-6: Batch with requestAnimationFrame
         bufferRef.current += chunk.content
 
         if (!rafIdRef.current) {
@@ -147,7 +133,6 @@ export function StreamingDemo({
     }
 
     const onDone = () => {
-      // Flush any remaining buffer
       if (batchStrategy !== 'none' && bufferRef.current) {
         updateText(bufferRef.current)
       }
@@ -176,13 +161,12 @@ export function StreamingDemo({
     }
   }, [handleStop])
 
+  // Timer effect
   useEffect(() => {
     if (isStreaming) {
       timerStartRef.current = performance.now()
       const tick = () => {
-        if (timerStartRef.current === null) {
-          return
-        }
+        if (timerStartRef.current === null) return
         setElapsedMs(performance.now() - timerStartRef.current)
         timerRafRef.current = requestAnimationFrame(tick)
       }
@@ -205,6 +189,7 @@ export function StreamingDemo({
     }
   }, [isStreaming])
 
+  // Segments for hybrid renderer
   const segmentsWithOffsets = useMemo(() => {
     const parsed = parseTaggedSegments(displayText)
     return parsed.map((segment, index) => ({
@@ -213,98 +198,11 @@ export function StreamingDemo({
     }))
   }, [displayText])
 
-  // Windowing logic
-  const charsPerPixel = 0.12 // Approximate characters per pixel height
-  const totalHeight = useWindowing ? displayText.length / charsPerPixel : 0
-
-  const {
-    windowedText,
-    windowStart,
-    windowEnd,
-    renderOffset,
-    visibleSegments,
-    hybridWindowText,
-  } = useMemo(() => {
-    if (!useWindowing || !displayText) {
-      return {
-        windowedText: displayText,
-        windowStart: 0,
-        windowEnd: displayText.length,
-        renderOffset: 0,
-        visibleSegments: segmentsWithOffsets,
-        hybridWindowText: displayText,
-      }
-    }
-
-    const startChar = Math.max(0, Math.floor(scrollTop * charsPerPixel) - WINDOW_BUFFER)
-    const endChar = Math.min(
-      displayText.length,
-      startChar + WINDOW_SIZE + WINDOW_BUFFER * 2
-    )
-
-    const rawSlice = displayText.slice(startChar, endChar)
-    const overlappingSegments = segmentsWithOffsets.filter(
-      (segment) => segment.end > startChar && segment.start < endChar
-    )
-
-    const trimmedSegments = overlappingSegments
-      .map((segment) => {
-        const segmentStart = Math.max(segment.start, startChar)
-        const segmentEnd = Math.min(segment.end, endChar)
-
-        if (segmentEnd <= segmentStart) {
-          return null
-        }
-
-        const relativeStart = segmentStart - segment.start
-        const relativeEnd = segmentEnd - segment.start
-
-        return {
-          ...segment,
-          content: segment.content.slice(relativeStart, relativeEnd),
-          start: segmentStart,
-          end: segmentEnd,
-          key: `${segment.key}-${segmentStart}-${segmentEnd}`,
-        }
-      })
-      .filter((segment): segment is HybridSegment => Boolean(segment && segment.content.length > 0))
-
-    if (trimmedSegments.length === 0) {
-      return {
-        windowedText: rawSlice,
-        windowStart: startChar,
-        windowEnd: endChar,
-        renderOffset: startChar,
-        visibleSegments: [],
-        hybridWindowText: rawSlice,
-      }
-    }
-
-    const joinedContent = trimmedSegments.map((segment) => segment.content).join('')
-
-    return {
-      windowedText: rawSlice,
-      windowStart: startChar,
-      windowEnd: endChar,
-      renderOffset: startChar,
-      visibleSegments: trimmedSegments,
-      hybridWindowText: joinedContent,
-    }
-  }, [charsPerPixel, displayText, scrollTop, segmentsWithOffsets, useWindowing])
-
   const mergeSegments = useCallback((items: HybridSegment[]) => {
     return items.reduce<HybridSegment[]>((acc, segment) => {
-      if (!segment.content) {
-        return acc
-      }
-
+      if (!segment.content) return acc
       const last = acc[acc.length - 1]
-
-      if (
-        last &&
-        last.type === segment.type &&
-        segment.type !== 'tool'
-      ) {
+      if (last && last.type === segment.type && segment.type !== 'tool') {
         acc[acc.length - 1] = {
           ...last,
           content: `${last.content}${segment.content}`,
@@ -314,7 +212,6 @@ export function StreamingDemo({
       } else {
         acc.push({ ...segment })
       }
-
       return acc
     }, [])
   }, [])
@@ -324,19 +221,41 @@ export function StreamingDemo({
     [mergeSegments, segmentsWithOffsets]
   )
 
-  const windowedHybridSegments = useMemo(
-    () => mergeSegments(visibleSegments),
-    [mergeSegments, visibleSegments]
-  )
-
-  const handleScroll = useCallback(
-    (e: React.UIEvent<HTMLDivElement>) => {
-      if (useWindowing) {
-        setScrollTop(e.currentTarget.scrollTop)
-      }
-    },
-    [useWindowing]
-  )
+  // CSS-optimized chunked rendering
+  // Splits content into chunks that can benefit from content-visibility: auto
+  const cssOptimizedChunks = useMemo(() => {
+    if (!displayText) return []
+    const result: { id: number; content: string; segments: HybridSegment[] }[] = []
+    for (let i = 0; i < displayText.length; i += CSS_CHUNK_SIZE) {
+      const chunkContent = displayText.slice(i, i + CSS_CHUNK_SIZE)
+      const chunkSegments = parseTaggedSegments(chunkContent).map((seg, idx) => ({
+        ...seg,
+        key: `chunk-${i}-${seg.type}-${idx}-${seg.start}`,
+      }))
+      // Merge adjacent segments of the same type
+      const merged = chunkSegments.reduce<HybridSegment[]>((acc, segment) => {
+        if (!segment.content) return acc
+        const last = acc[acc.length - 1]
+        if (last && last.type === segment.type && segment.type !== 'tool') {
+          acc[acc.length - 1] = {
+            ...last,
+            content: `${last.content}${segment.content}`,
+            start: Math.min(last.start, segment.start),
+            end: Math.max(last.end, segment.end),
+          }
+        } else {
+          acc.push({ ...segment })
+        }
+        return acc
+      }, [])
+      result.push({
+        id: Math.floor(i / CSS_CHUNK_SIZE),
+        content: chunkContent,
+        segments: merged,
+      })
+    }
+    return result
+  }, [displayText])
 
   // Determine which state indicators to show
   const showIsPending = shouldUseTransition
@@ -420,14 +339,18 @@ export function StreamingDemo({
         elapsedMs={elapsedMs}
       />
 
-      {useWindowing && displayText && (
-        <div className="window-indicator">
+      {(outputTab === 'css-optimized' || outputTab === 'css-markdown') && displayText && (
+        <div className="css-optimized-indicator">
           <span>
-            Rendering chars {windowStart.toLocaleString()} - {windowEnd.toLocaleString()} of{' '}
-            {displayText.length.toLocaleString()}
+            CSS Optimized (
+            {outputTab === 'css-markdown'
+              ? 'Markdown Only'
+              : 'Hybrid'}
+            ): {' '}
+            {cssOptimizedChunks.length.toLocaleString()} chunks
           </span>
-          <span className="window-percent">
-            ({Math.round((WINDOW_SIZE / Math.max(displayText.length, 1)) * 100)}% rendered)
+          <span className="chunk-info">
+            {displayText.length.toLocaleString()} chars | content-visibility: auto
           </span>
         </div>
       )}
@@ -449,19 +372,28 @@ export function StreamingDemo({
               className={`output-tab ${outputTab === 'markdown' ? 'active' : ''}`}
               onClick={() => setOutputTab('markdown')}
             >
-              Markdown (Heavy)
+              Markdown Only
             </button>
             <button
               className={`output-tab ${outputTab === 'hybrid' ? 'active' : ''}`}
               onClick={() => setOutputTab('hybrid')}
             >
-              Hybrid
+              Hybrid (Text + Markdown Mix)
+            </button>
+            <button
+              className={`output-tab ${outputTab === 'css-markdown' ? 'active' : ''}`}
+              onClick={() => setOutputTab('css-markdown')}
+            >
+              Markdown Only (With CSS optimizations)
+            </button>
+            <button
+              className={`output-tab ${outputTab === 'css-optimized' ? 'active' : ''}`}
+              onClick={() => setOutputTab('css-optimized')}
+            >
+              Hybrid (With CSS optimization)
             </button>
           </div>
           <div className="output-badges">
-            {useWindowing && (
-              <span className="output-badge windowed-badge">Windowed</span>
-            )}
             {showIsPending && isPending && (
               <span className="output-badge pending-badge">Pending...</span>
             )}
@@ -473,37 +405,18 @@ export function StreamingDemo({
         <div
           ref={outputContentRef}
           className="output-content chat-scroller"
-          onScroll={handleScroll}
-          style={useWindowing ? { position: 'relative' } : undefined}
         >
           {displayText ? (
-            useWindowing ? (
-              <div style={{ height: totalHeight, position: 'relative' }}>
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: renderOffset / charsPerPixel,
-                    left: 0,
-                    right: 0,
-                  }}
-                >
-                  {outputTab === 'markdown' ? (
-                    <div className="llm-chunk llmChunk llm-chunk--markdown llmChunk--markdown">
-                      <MarkdownRenderer content={windowedText} />
-                    </div>
-                  ) : outputTab === 'hybrid' ? (
-                    <div className="hybrid-output">
-                      <HybridRenderer
-                        segments={windowedHybridSegments}
-                        content={hybridWindowText}
-                      />
-                    </div>
-                  ) : (
-                    <div className="llm-chunk llmChunk llm-chunk--text llmChunk--text">
-                      <PlainTextRenderer content={windowedText} />
-                    </div>
-                  )}
-                </div>
+            outputTab === 'css-optimized' || outputTab === 'css-markdown' ? (
+              <div className="css-optimized-output">
+                {cssOptimizedChunks.map((chunk) => (
+                  <CssOptimizedChunk
+                    key={chunk.id}
+                    segments={chunk.segments}
+                    content={chunk.content}
+                    mode={outputTab === 'css-markdown' ? 'markdown' : 'hybrid'}
+                  />
+                ))}
               </div>
             ) : outputTab === 'markdown' ? (
               <div className="llm-chunk llmChunk llm-chunk--markdown llmChunk--markdown">
@@ -527,4 +440,61 @@ export function StreamingDemo({
       </div>
     </div>
   )
+}
+
+// CSS-optimized chunk component with content-visibility: auto support
+// Each chunk is isolated for layout/paint containment and can be skipped when offscreen
+interface CssOptimizedChunkProps {
+  segments: HybridSegment[]
+  content: string
+  mode?: 'hybrid' | 'markdown'
+}
+
+function CssOptimizedChunk({ segments, content, mode = 'hybrid' }: CssOptimizedChunkProps) {
+  const chunkRef = useRef<HTMLDivElement>(null)
+  const [isVisible, setIsVisible] = useState(false)
+
+  // Use contentvisibilityautostatechange event to defer heavy work
+  // This fires when content-visibility: auto transitions between visible/hidden
+  useEffect(() => {
+    const element = chunkRef.current
+    if (!element) return
+
+    const handleVisibilityChange = (event: Event) => {
+      // The event tells us if the content is now visible or skipped
+      const isNowVisible = !(event as ContentVisibilityAutoStateChangeEvent).skipped
+      setIsVisible(isNowVisible)
+    }
+
+    // Add listener for content visibility changes
+    element.addEventListener('contentvisibilityautostatechange', handleVisibilityChange)
+
+    // Initial state - assume visible until proven otherwise
+    setIsVisible(true)
+
+    return () => {
+      element.removeEventListener('contentvisibilityautostatechange', handleVisibilityChange)
+    }
+  }, [])
+
+  return (
+    <div
+      ref={chunkRef}
+      className="css-optimized-chunk"
+      data-visible={isVisible}
+    >
+      {mode === 'markdown' ? (
+        <div className="llm-chunk llmChunk llm-chunk--markdown llmChunk--markdown">
+          <MarkdownRenderer content={content} />
+        </div>
+      ) : (
+        <HybridRenderer segments={segments} content={content} />
+      )}
+    </div>
+  )
+}
+
+// TypeScript declaration for the content visibility event
+interface ContentVisibilityAutoStateChangeEvent extends Event {
+  skipped: boolean
 }

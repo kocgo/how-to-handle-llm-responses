@@ -25,7 +25,7 @@ function renderSegmentContent(segment: TaggedSegment) {
 }
 
 export function HybridRenderer({ content = '', segments }: HybridRendererProps) {
-  const computedSegments = useMemo(() => {
+  const computedSegments = useMemo((): (TaggedSegment & { key?: string })[] => {
     if (segments) {
       return segments
     }

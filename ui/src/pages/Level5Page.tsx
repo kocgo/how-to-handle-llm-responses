@@ -133,44 +133,8 @@ export function Level5Page() {
         </p>
       </section>
 
-      <section className="summary-section">
-        <h2>Summary: The Journey</h2>
-        <div className="journey-cards">
-          <div className="journey-card">
-            <h3>Level 1</h3>
-            <p>Naive setState on every chunk</p>
-            <span className="journey-result bad">Poor performance</span>
-          </div>
-          <div className="journey-card">
-            <h3>Level 2</h3>
-            <p>Batch with requestAnimationFrame</p>
-            <span className="journey-result better">Fewer renders</span>
-          </div>
-          <div className="journey-card">
-            <h3>Level 3</h3>
-            <p>startTransition for priority</p>
-            <span className="journey-result better">Interruptible</span>
-          </div>
-          <div className="journey-card">
-            <h3>Level 4</h3>
-            <p>useDeferredValue for expensive renders</p>
-            <span className="journey-result better">Deferred rendering</span>
-          </div>
-          <div className="journey-card highlight">
-            <h3>Level 5</h3>
-            <p>All optimizations combined</p>
-            <span className="journey-result best">Production-ready</span>
-          </div>
-        </div>
-      </section>
-
       <section className="demo-section">
         <h2>Live Demo</h2>
-        <p className="demo-instruction">
-          This is the production-ready version. Try typing while streaming at
-          high speed. Notice both isPending and isStale indicators. Compare the
-          FPS and render count to Level 1!
-        </p>
         <StreamingDemo
           level={5}
           batchStrategy="raf"
