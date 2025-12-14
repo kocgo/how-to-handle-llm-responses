@@ -7,21 +7,7 @@ interface MarkdownRendererProps {
   content: string
 }
 
-// Artificial CPU load to simulate expensive rendering
-function simulateExpensiveWork(iterations: number = 5000) {
-  let result = 0
-  for (let i = 0; i < iterations; i++) {
-    result += Math.sqrt(i) * Math.sin(i)
-  }
-  return result
-}
-
 function MarkdownRendererInner({ content }: MarkdownRendererProps) {
-  // Simulate expensive computation during render
-  // Scale with content length to make longer content more expensive
-  const workLoad = Math.min(content.length * 10, 50000)
-  simulateExpensiveWork(workLoad)
-
   return (
     <ReactMarkdown
       components={{

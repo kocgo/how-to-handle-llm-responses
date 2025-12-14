@@ -3,7 +3,6 @@ export type Level = 1 | 2 | 3 | 4 | 5 | 6 | 7
 
 export interface StreamChunk {
   content: string
-  format: 'text' | 'markdown'
 }
 
 export interface PerformanceMetrics {

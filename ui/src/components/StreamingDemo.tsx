@@ -10,6 +10,10 @@ import React, {
 import { fetchStream } from '../utils/stream'
 import { MetricsPanel } from './MetricsPanel'
 import { MarkdownRenderer } from './MarkdownRenderer'
+import { PlainTextRenderer } from './PlainTextRenderer'
+import { HybridRenderer } from './HybridRenderer'
+import { useFps } from '../hooks/useFps'
+import { parseTaggedSegments, TaggedSegment } from '../utils/segments'
 import { Level, BatchStrategy, StreamChunk } from '../types'
 
 interface StreamingDemoProps {
@@ -20,12 +24,13 @@ interface StreamingDemoProps {
   useWindowing?: boolean
 }
 
-type HybridSegment = StreamChunk & { start?: number; end?: number; key?: string }
+type HybridSegment = TaggedSegment & { key: string }
 
 const WINDOW_SIZE = 4000 // Characters to render at a time
 const WINDOW_BUFFER = 1000 // Extra buffer above/below
 const LINE_HEIGHT = 24 // Approximate line height in pixels
 const CHARS_PER_LINE = 80 // Approximate characters per line
+const MAX_FPS_HISTORY = 120
 
 export function StreamingDemo({
   level,
@@ -38,27 +43,61 @@ export function StreamingDemo({
   const [isPending, startTransition] = useTransition()
   const deferredText = useDeferredValue(text)
   const isStale = text !== deferredText
+  const displayText = shouldUseDeferredValue ? deferredText : text
+  const currentFps = useFps()
+  const [fpsHistory, setFpsHistory] = useState<number[]>([])
+  const [elapsedMs, setElapsedMs] = useState(0)
 
   const [isStreaming, setIsStreaming] = useState(false)
-  const [wordCount, setWordCount] = useState(300000)
+  const [wordCount, setWordCount] = useState(1000000)
   const [delay, setDelay] = useState(1)
   const [inputValue, setInputValue] = useState('')
   const [outputTab, setOutputTab] = useState<'text' | 'markdown' | 'hybrid'>('hybrid')
   const [scrollTop, setScrollTop] = useState(0)
-  const [segments, setSegments] = useState<StreamChunk[]>([])
 
   const abortControllerRef = useRef<AbortController | null>(null)
   const bufferRef = useRef('')
-  const segmentBufferRef = useRef<StreamChunk[]>([])
   const rafIdRef = useRef<number>()
   const outputContentRef = useRef<HTMLDivElement>(null)
+  const timerStartRef = useRef<number | null>(null)
+  const timerRafRef = useRef<number>()
+
+  useEffect(() => {
+    const container = outputContentRef.current
+    if (!container) {
+      return
+    }
+
+    container.scrollTop = container.scrollHeight
+    if (useWindowing) {
+      setScrollTop(container.scrollTop)
+    }
+  }, [displayText, useWindowing])
+
+  useEffect(() => {
+    if (!isStreaming) {
+      return
+    }
+    setFpsHistory((prev) => {
+      const next = [...prev, currentFps]
+      if (next.length > MAX_FPS_HISTORY) {
+        return next.slice(next.length - MAX_FPS_HISTORY)
+      }
+      return next
+    })
+  }, [currentFps, isStreaming])
 
   const handleReset = useCallback(() => {
     setText('')
     bufferRef.current = ''
-    segmentBufferRef.current = []
     setScrollTop(0)
-    setSegments([])
+    setFpsHistory([])
+    setElapsedMs(0)
+    if (timerRafRef.current) {
+      cancelAnimationFrame(timerRafRef.current)
+      timerRafRef.current = undefined
+    }
+    timerStartRef.current = null
   }, [])
 
   const handleStop = useCallback(() => {
@@ -93,17 +132,14 @@ export function StreamingDemo({
       if (batchStrategy === 'none') {
         // Level 1: Naive - setState on every chunk
         setText((prev) => prev + chunk.content)
-        setSegments((prev) => [...prev, chunk])
       } else if (batchStrategy === 'raf') {
         // Levels 2-6: Batch with requestAnimationFrame
         bufferRef.current += chunk.content
-        segmentBufferRef.current.push(chunk)
 
         if (!rafIdRef.current) {
           rafIdRef.current = requestAnimationFrame(() => {
             const snapshot = bufferRef.current
             updateText(snapshot)
-            setSegments([...segmentBufferRef.current])
             rafIdRef.current = undefined
           })
         }
@@ -114,7 +150,6 @@ export function StreamingDemo({
       // Flush any remaining buffer
       if (batchStrategy !== 'none' && bufferRef.current) {
         updateText(bufferRef.current)
-        setSegments([...segmentBufferRef.current])
       }
       setIsStreaming(false)
     }
@@ -141,16 +176,64 @@ export function StreamingDemo({
     }
   }, [handleStop])
 
-  // Determine which text to render
-  const displayText = shouldUseDeferredValue ? deferredText : text
+  useEffect(() => {
+    if (isStreaming) {
+      timerStartRef.current = performance.now()
+      const tick = () => {
+        if (timerStartRef.current === null) {
+          return
+        }
+        setElapsedMs(performance.now() - timerStartRef.current)
+        timerRafRef.current = requestAnimationFrame(tick)
+      }
+      timerRafRef.current = requestAnimationFrame(tick)
+      return () => {
+        if (timerRafRef.current) {
+          cancelAnimationFrame(timerRafRef.current)
+          timerRafRef.current = undefined
+        }
+      }
+    } else {
+      if (timerRafRef.current) {
+        cancelAnimationFrame(timerRafRef.current)
+        timerRafRef.current = undefined
+      }
+      if (timerStartRef.current !== null) {
+        setElapsedMs(performance.now() - timerStartRef.current)
+        timerStartRef.current = null
+      }
+    }
+  }, [isStreaming])
+
+  const segmentsWithOffsets = useMemo(() => {
+    const parsed = parseTaggedSegments(displayText)
+    return parsed.map((segment, index) => ({
+      ...segment,
+      key: `${segment.type}-${index}-${segment.start}`,
+    }))
+  }, [displayText])
 
   // Windowing logic
   const charsPerPixel = 0.12 // Approximate characters per pixel height
   const totalHeight = useWindowing ? displayText.length / charsPerPixel : 0
 
-  const { windowedText, windowStart, windowEnd } = useMemo(() => {
+  const {
+    windowedText,
+    windowStart,
+    windowEnd,
+    renderOffset,
+    visibleSegments,
+    hybridWindowText,
+  } = useMemo(() => {
     if (!useWindowing || !displayText) {
-      return { windowedText: displayText, windowStart: 0, windowEnd: displayText.length }
+      return {
+        windowedText: displayText,
+        windowStart: 0,
+        windowEnd: displayText.length,
+        renderOffset: 0,
+        visibleSegments: segmentsWithOffsets,
+        hybridWindowText: displayText,
+      }
     }
 
     const startChar = Math.max(0, Math.floor(scrollTop * charsPerPixel) - WINDOW_BUFFER)
@@ -159,29 +242,55 @@ export function StreamingDemo({
       startChar + WINDOW_SIZE + WINDOW_BUFFER * 2
     )
 
+    const rawSlice = displayText.slice(startChar, endChar)
+    const overlappingSegments = segmentsWithOffsets.filter(
+      (segment) => segment.end > startChar && segment.start < endChar
+    )
+
+    const trimmedSegments = overlappingSegments
+      .map((segment) => {
+        const segmentStart = Math.max(segment.start, startChar)
+        const segmentEnd = Math.min(segment.end, endChar)
+
+        if (segmentEnd <= segmentStart) {
+          return null
+        }
+
+        const relativeStart = segmentStart - segment.start
+        const relativeEnd = segmentEnd - segment.start
+
+        return {
+          ...segment,
+          content: segment.content.slice(relativeStart, relativeEnd),
+          start: segmentStart,
+          end: segmentEnd,
+          key: `${segment.key}-${segmentStart}-${segmentEnd}`,
+        }
+      })
+      .filter((segment): segment is HybridSegment => Boolean(segment && segment.content.length > 0))
+
+    if (trimmedSegments.length === 0) {
+      return {
+        windowedText: rawSlice,
+        windowStart: startChar,
+        windowEnd: endChar,
+        renderOffset: startChar,
+        visibleSegments: [],
+        hybridWindowText: rawSlice,
+      }
+    }
+
+    const joinedContent = trimmedSegments.map((segment) => segment.content).join('')
+
     return {
-      windowedText: displayText.slice(startChar, endChar),
+      windowedText: rawSlice,
       windowStart: startChar,
       windowEnd: endChar,
+      renderOffset: startChar,
+      visibleSegments: trimmedSegments,
+      hybridWindowText: joinedContent,
     }
-  }, [displayText, scrollTop, useWindowing])
-
-  const segmentsWithOffsets = useMemo(() => {
-    let cursor = 0
-
-    return segments.map((segment, index) => {
-      const start = cursor
-      const end = cursor + segment.content.length
-      cursor = end
-
-      return {
-        ...segment,
-        start,
-        end,
-        key: `${segment.format}-${index}-${start}`,
-      }
-    })
-  }, [segments])
+  }, [charsPerPixel, displayText, scrollTop, segmentsWithOffsets, useWindowing])
 
   const mergeSegments = useCallback((items: HybridSegment[]) => {
     return items.reduce<HybridSegment[]>((acc, segment) => {
@@ -191,12 +300,16 @@ export function StreamingDemo({
 
       const last = acc[acc.length - 1]
 
-      if (last && last.format === segment.format) {
+      if (
+        last &&
+        last.type === segment.type &&
+        segment.type !== 'tool'
+      ) {
         acc[acc.length - 1] = {
           ...last,
           content: `${last.content}${segment.content}`,
-          start: last.start ?? segment.start,
-          end: segment.end ?? last.end,
+          start: Math.min(last.start, segment.start),
+          end: Math.max(last.end, segment.end),
         }
       } else {
         acc.push({ ...segment })
@@ -206,33 +319,14 @@ export function StreamingDemo({
     }, [])
   }, [])
 
-  const slicedHybridSegments = useMemo(() => {
-    if (!useWindowing) {
-      return segmentsWithOffsets
-    }
-
-    return segmentsWithOffsets
-      .filter((segment) => segment.end !== undefined && segment.start !== undefined)
-      .filter((segment) => segment.end! > windowStart && segment.start! < windowEnd)
-      .map((segment) => {
-        const sliceStart = Math.max(0, windowStart - (segment.start ?? 0))
-        const sliceEnd = Math.min(segment.content.length, windowEnd - (segment.start ?? 0))
-
-        return {
-          ...segment,
-          content: segment.content.slice(sliceStart, sliceEnd),
-        }
-      })
-  }, [segmentsWithOffsets, useWindowing, windowEnd, windowStart])
-
   const mergedHybridSegments = useMemo(
     () => mergeSegments(segmentsWithOffsets),
     [mergeSegments, segmentsWithOffsets]
   )
 
   const windowedHybridSegments = useMemo(
-    () => mergeSegments(slicedHybridSegments),
-    [mergeSegments, slicedHybridSegments]
+    () => mergeSegments(visibleSegments),
+    [mergeSegments, visibleSegments]
   )
 
   const handleScroll = useCallback(
@@ -248,22 +342,6 @@ export function StreamingDemo({
   const showIsPending = shouldUseTransition
   const showIsStale = shouldUseDeferredValue
 
-  const renderHybridSegments = (items: HybridSegment[]) =>
-    items.map((segment, index) => (
-      <div
-        key={segment.key ?? `${segment.format}-${index}-${segment.start ?? 'start'}`}
-        className={`llm-chunk llmChunk ${
-          segment.format === 'markdown' ? 'llm-chunk--markdown llmChunk--markdown' : 'llm-chunk--text llmChunk--text'
-        }`}
-      >
-        {segment.format === 'markdown' ? (
-          <MarkdownRenderer content={segment.content} />
-        ) : (
-          <pre className="plain-text-output hybrid-text-block">{segment.content}</pre>
-        )}
-      </div>
-    ))
-
   return (
     <div className="streaming-demo">
       <div className="demo-controls">
@@ -275,7 +353,7 @@ export function StreamingDemo({
             id={`words-${level}`}
             type="range"
             min="100"
-            max="300000"
+            max="1000000"
             step="100"
             value={wordCount}
             onChange={(e) => setWordCount(Number(e.target.value))}
@@ -337,6 +415,9 @@ export function StreamingDemo({
         isStreaming={isStreaming}
         isPending={showIsPending ? isPending : undefined}
         isStale={showIsStale ? isStale : undefined}
+        fpsHistory={fpsHistory}
+        currentFps={currentFps}
+        elapsedMs={elapsedMs}
       />
 
       {useWindowing && displayText && (
@@ -401,7 +482,7 @@ export function StreamingDemo({
                 <div
                   style={{
                     position: 'absolute',
-                    top: windowStart / charsPerPixel,
+                    top: renderOffset / charsPerPixel,
                     left: 0,
                     right: 0,
                   }}
@@ -411,10 +492,15 @@ export function StreamingDemo({
                       <MarkdownRenderer content={windowedText} />
                     </div>
                   ) : outputTab === 'hybrid' ? (
-                    renderHybridSegments(windowedHybridSegments)
+                    <div className="hybrid-output">
+                      <HybridRenderer
+                        segments={windowedHybridSegments}
+                        content={hybridWindowText}
+                      />
+                    </div>
                   ) : (
                     <div className="llm-chunk llmChunk llm-chunk--text llmChunk--text">
-                      <pre className="plain-text-output">{windowedText}</pre>
+                      <PlainTextRenderer content={windowedText} />
                     </div>
                   )}
                 </div>
@@ -424,10 +510,12 @@ export function StreamingDemo({
                 <MarkdownRenderer content={displayText} />
               </div>
             ) : outputTab === 'hybrid' ? (
-              <div className="hybrid-output">{renderHybridSegments(mergedHybridSegments)}</div>
+              <div className="hybrid-output">
+                <HybridRenderer segments={mergedHybridSegments} content={displayText} />
+              </div>
             ) : (
               <div className="llm-chunk llmChunk llm-chunk--text llmChunk--text">
-                <pre className="plain-text-output">{displayText}</pre>
+                <PlainTextRenderer content={displayText} />
               </div>
             )
           ) : (

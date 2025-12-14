@@ -3,35 +3,54 @@ import { URL } from 'node:url'
 
 const PORT = Number(process.env.PORT || 3001)
 const HOST = process.env.HOST || '0.0.0.0'
+const MAX_WORDS = 1_000_000
 
-type ChunkFormat = 'text' | 'markdown'
+type SectionType = 'text' | 'markdown' | 'tool'
+
+interface Section {
+  type: SectionType
+  content: string
+}
 
 interface StreamPayload {
   content: string
-  format: ChunkFormat
 }
 
-const BASE_SECTIONS: StreamPayload[] = [
+const BASE_SECTIONS: Section[] = [
   {
-    format: 'text',
+    type: 'text',
     content:
       'Here is a mixed response that combines short narrative explanations with rich formatting. The server intentionally emits plain sentences alongside markdown so the UI can exercise different renderers.',
   },
   {
-    format: 'markdown',
+    type: 'markdown',
     content: `## Quick takeaways\n- Streaming content can include **inline emphasis** and bullet points.\n- Mixing plain text with markdown is common for LLMs.\n- Clients need to stitch chunks together without losing formatting.\n`,
   },
   {
-    format: 'text',
+    type: 'text',
     content:
       'To mimic how an assistant might pivot, the payload also sprinkles in code commentary before dropping a fenced block.',
   },
   {
-    format: 'markdown',
+    type: 'markdown',
     content: '```ts\nexport async function fetchData() {\n  return Promise.resolve("example payload")\n}\n```\n',
   },
   {
-    format: 'text',
+    type: 'tool',
+    content: JSON.stringify(
+      {
+        name: 'retrieve_docs',
+        arguments: {
+          topic: 'LLM streaming optimizations',
+          maxResults: 3,
+        },
+      },
+      null,
+      2
+    ),
+  },
+  {
+    type: 'text',
     content:
       'The stream finishes with a short recap and an invitation to adjust settings like token count and delay for stress testing.',
   },
@@ -41,35 +60,45 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-function expandSections(words: number): StreamPayload[] {
-  const tokens: StreamPayload[] = []
+function renderSection(section: Section, iteration: number): string {
+  const suffix = iteration === 1 ? '' : ` (pass ${iteration})`
+
+  if (section.type === 'markdown') {
+    return `<markdown>\n${section.content}\n</markdown>${suffix}`
+  }
+
+  if (section.type === 'tool') {
+    return `<use_tool>\n${section.content}\n</use_tool>`
+  }
+
+  return `${section.content}${suffix}`
+}
+
+function* generatePayloads(words: number): Generator<StreamPayload> {
   let iteration = 1
+  let emitted = 0
 
-  while (tokens.length < words) {
+  while (emitted < words) {
     for (const section of BASE_SECTIONS) {
-      const decoratedContent =
-        iteration === 1
-          ? section.content
-          : `${section.content} (pass ${iteration})`
+      if (emitted >= words) {
+        break
+      }
 
-      const parts = decoratedContent.split(/(\s+)/).filter(part => part.length > 0)
+      const rendered = renderSection(section, iteration)
+      const parts = rendered.split(/(\s+)/).filter(part => part.length > 0)
 
       for (const part of parts) {
-        tokens.push({
-          content: part,
-          format: section.format,
-        })
+        yield { content: part }
+        emitted += 1
 
-        if (tokens.length >= words) {
-          return tokens
+        if (emitted >= words) {
+          return
         }
       }
     }
 
     iteration += 1
   }
-
-  return tokens
 }
 
 const server = http.createServer(async (req, res) => {
@@ -95,7 +124,10 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Parse query parameters
-  const words = Math.min(Math.max(parseInt(url.searchParams.get('words') || '100', 10), 1), 10000)
+  const words = Math.min(
+    Math.max(parseInt(url.searchParams.get('words') || '100', 10), 1),
+    MAX_WORDS
+  )
   const delay = Math.min(Math.max(parseInt(url.searchParams.get('delay') || '50', 10), 1), 1000)
 
   // Set SSE headers
@@ -112,11 +144,13 @@ const server = http.createServer(async (req, res) => {
     aborted = true
   })
 
-  const payloads = expandSections(words)
-
   // Stream tokens
-  for (let i = 0; i < payloads.length && !aborted; i++) {
-    const data = JSON.stringify(payloads[i])
+  for (const payload of generatePayloads(words)) {
+    if (aborted) {
+      break
+    }
+
+    const data = JSON.stringify(payload)
     res.write(`data: ${data}\n\n`)
 
     // Small delay between tokens

@@ -6,6 +6,21 @@ interface MetricsPanelProps {
   isStreaming: boolean
   isPending?: boolean
   isStale?: boolean
+  fpsHistory: number[]
+  currentFps: number
+  elapsedMs: number
+}
+
+const formatElapsed = (ms: number): string => {
+  if (!ms) {
+    return '00:00.0'
+  }
+  const totalSeconds = ms / 1000
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds - minutes * 60
+  const minuteString = String(minutes).padStart(2, '0')
+  const secondString = seconds.toFixed(1).padStart(4, '0')
+  return `${minuteString}:${secondString}`
 }
 
 export function MetricsPanel({
@@ -13,11 +28,20 @@ export function MetricsPanel({
   isStreaming,
   isPending,
   isStale,
+  fpsHistory,
+  currentFps,
+  elapsedMs,
 }: MetricsPanelProps) {
+  const timerLabel = isStreaming ? 'Elapsed Time' : elapsedMs > 0 ? 'Last Run Time' : 'Elapsed Time'
+
   return (
     <div className="metrics-panel">
       <div className="metrics-row">
-        <FpsCounter />
+        <FpsCounter history={fpsHistory} currentFps={currentFps} />
+        <div className="metric timer-metric">
+          <span className="metric-value">{formatElapsed(elapsedMs)}</span>
+          <span className="metric-label">{timerLabel}</span>
+        </div>
         <div className="metric">
           <span className="metric-value">{charCount}</span>
           <span className="metric-label">Chars</span>
