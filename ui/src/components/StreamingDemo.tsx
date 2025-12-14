@@ -5,6 +5,7 @@ import React, {
   useTransition,
   useDeferredValue,
   useEffect,
+  useMemo,
 } from 'react'
 import { fetchStream } from '../utils/stream'
 import { MetricsPanel } from './MetricsPanel'
@@ -16,13 +17,20 @@ interface StreamingDemoProps {
   batchStrategy: BatchStrategy
   useTransition: boolean
   useDeferredValue: boolean
+  useWindowing?: boolean
 }
+
+const WINDOW_SIZE = 4000 // Characters to render at a time
+const WINDOW_BUFFER = 1000 // Extra buffer above/below
+const LINE_HEIGHT = 24 // Approximate line height in pixels
+const CHARS_PER_LINE = 80 // Approximate characters per line
 
 export function StreamingDemo({
   level,
   batchStrategy,
   useTransition: shouldUseTransition,
   useDeferredValue: shouldUseDeferredValue,
+  useWindowing = false,
 }: StreamingDemoProps) {
   const [text, setText] = useState('')
   const [isPending, startTransition] = useTransition()
@@ -30,18 +38,21 @@ export function StreamingDemo({
   const isStale = text !== deferredText
 
   const [isStreaming, setIsStreaming] = useState(false)
-  const [wordCount, setWordCount] = useState(100000)
+  const [wordCount, setWordCount] = useState(300000)
   const [delay, setDelay] = useState(1)
   const [inputValue, setInputValue] = useState('')
   const [outputTab, setOutputTab] = useState<'text' | 'markdown'>('markdown')
+  const [scrollTop, setScrollTop] = useState(0)
 
   const abortControllerRef = useRef<AbortController | null>(null)
   const bufferRef = useRef('')
   const rafIdRef = useRef<number>()
+  const outputContentRef = useRef<HTMLDivElement>(null)
 
   const handleReset = useCallback(() => {
     setText('')
     bufferRef.current = ''
+    setScrollTop(0)
   }, [])
 
   const handleStop = useCallback(() => {
@@ -77,7 +88,7 @@ export function StreamingDemo({
         // Level 1: Naive - setState on every chunk
         setText((prev) => prev + token)
       } else if (batchStrategy === 'raf') {
-        // Levels 2-5: Batch with requestAnimationFrame
+        // Levels 2-6: Batch with requestAnimationFrame
         bufferRef.current += token
 
         if (!rafIdRef.current) {
@@ -123,6 +134,37 @@ export function StreamingDemo({
   // Determine which text to render
   const displayText = shouldUseDeferredValue ? deferredText : text
 
+  // Windowing logic
+  const charsPerPixel = 0.12 // Approximate characters per pixel height
+  const totalHeight = useWindowing ? displayText.length / charsPerPixel : 0
+
+  const { windowedText, windowStart, windowEnd } = useMemo(() => {
+    if (!useWindowing || !displayText) {
+      return { windowedText: displayText, windowStart: 0, windowEnd: displayText.length }
+    }
+
+    const startChar = Math.max(0, Math.floor(scrollTop * charsPerPixel) - WINDOW_BUFFER)
+    const endChar = Math.min(
+      displayText.length,
+      startChar + WINDOW_SIZE + WINDOW_BUFFER * 2
+    )
+
+    return {
+      windowedText: displayText.slice(startChar, endChar),
+      windowStart: startChar,
+      windowEnd: endChar,
+    }
+  }, [displayText, scrollTop, useWindowing])
+
+  const handleScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      if (useWindowing) {
+        setScrollTop(e.currentTarget.scrollTop)
+      }
+    },
+    [useWindowing]
+  )
+
   // Determine which state indicators to show
   const showIsPending = shouldUseTransition
   const showIsStale = shouldUseDeferredValue
@@ -138,7 +180,7 @@ export function StreamingDemo({
             id={`words-${level}`}
             type="range"
             min="100"
-            max="100000"
+            max="300000"
             step="100"
             value={wordCount}
             onChange={(e) => setWordCount(Number(e.target.value))}
@@ -202,6 +244,18 @@ export function StreamingDemo({
         isStale={showIsStale ? isStale : undefined}
       />
 
+      {useWindowing && displayText && (
+        <div className="window-indicator">
+          <span>
+            Rendering chars {windowStart.toLocaleString()} - {windowEnd.toLocaleString()} of{' '}
+            {displayText.length.toLocaleString()}
+          </span>
+          <span className="window-percent">
+            ({Math.round((WINDOW_SIZE / Math.max(displayText.length, 1)) * 100)}% rendered)
+          </span>
+        </div>
+      )}
+
       <div
         className={`output-area ${isPending && showIsPending ? 'pending' : ''} ${isStale && showIsStale ? 'stale' : ''}`}
       >
@@ -221,6 +275,9 @@ export function StreamingDemo({
             </button>
           </div>
           <div className="output-badges">
+            {useWindowing && (
+              <span className="output-badge windowed-badge">Windowed</span>
+            )}
             {showIsPending && isPending && (
               <span className="output-badge pending-badge">Pending...</span>
             )}
@@ -229,9 +286,31 @@ export function StreamingDemo({
             )}
           </div>
         </div>
-        <div className="output-content">
+        <div
+          ref={outputContentRef}
+          className="output-content"
+          onScroll={handleScroll}
+          style={useWindowing ? { position: 'relative' } : undefined}
+        >
           {displayText ? (
-            outputTab === 'markdown' ? (
+            useWindowing ? (
+              <div style={{ height: totalHeight, position: 'relative' }}>
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: windowStart / charsPerPixel,
+                    left: 0,
+                    right: 0,
+                  }}
+                >
+                  {outputTab === 'markdown' ? (
+                    <MarkdownRenderer content={windowedText} />
+                  ) : (
+                    <pre className="plain-text-output">{windowedText}</pre>
+                  )}
+                </div>
+              </div>
+            ) : outputTab === 'markdown' ? (
               <MarkdownRenderer content={displayText} />
             ) : (
               <pre className="plain-text-output">{displayText}</pre>

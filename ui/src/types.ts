@@ -1,5 +1,5 @@
 export type BatchStrategy = 'none' | 'raf' | 'interval'
-export type Level = 1 | 2 | 3 | 4 | 5
+export type Level = 1 | 2 | 3 | 4 | 5 | 6
 
 export interface StreamChunk {
   token: string
@@ -18,6 +18,7 @@ export interface LevelConfig {
   batchStrategy: BatchStrategy
   useTransition: boolean
   useDeferredValue: boolean
+  useWindowing?: boolean
 }
 
 export const LEVEL_CONFIGS: LevelConfig[] = [
@@ -60,5 +61,14 @@ export const LEVEL_CONFIGS: LevelConfig[] = [
     batchStrategy: 'raf',
     useTransition: true,
     useDeferredValue: true,
+  },
+  {
+    level: 6,
+    name: 'Windowed',
+    description: 'Virtualized rendering',
+    batchStrategy: 'raf',
+    useTransition: true,
+    useDeferredValue: true,
+    useWindowing: true,
   },
 ]

@@ -11,7 +11,7 @@ export function Layout({ children, currentLevel }: LayoutProps) {
   const location = useLocation()
 
   const prevLevel = currentLevel > 1 ? currentLevel - 1 : null
-  const nextLevel = currentLevel < 5 ? currentLevel + 1 : null
+  const nextLevel = currentLevel < 6 ? currentLevel + 1 : null
 
   return (
     <div className="layout">
