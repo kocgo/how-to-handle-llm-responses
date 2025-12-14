@@ -1,0 +1,10 @@
+node_modules
+dist
+ui/dist
+server/dist
+coverage
+.playwright
+.husky
+*.lock
+.env
+.env.*

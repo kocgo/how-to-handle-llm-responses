@@ -1,0 +1,29 @@
+{
+  "name": "how-to-handle-llm-responses",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": ["ui", "server"],
+  "scripts": {
+    "install:all": "npm install --workspaces",
+    "dev:ui": "npm --workspace ui run dev",
+    "dev:server": "npm --workspace server run dev",
+    "build": "npm --workspace ui run build && npm --workspace server run build",
+    "test": "npm --workspace ui run test",
+    "prepare": "husky install",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "lint-staged": {
+    "ui/**/*.{js,jsx,ts,tsx,json,css,md}": [
+      "prettier --write"
+    ],
+    "server/**/*.{js,ts,json,md}": [
+      "prettier --write"
+    ]
+  },
+  "devDependencies": {
+    "husky": "^8.0.0",
+    "lint-staged": "^13.0.0",
+    "prettier": "^3.9.0"
+  }
+}
