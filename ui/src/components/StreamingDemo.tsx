@@ -249,15 +249,20 @@ export function StreamingDemo({
   const showIsStale = shouldUseDeferredValue
 
   const renderHybridSegments = (items: HybridSegment[]) =>
-    items.map((segment, index) =>
-      segment.format === 'markdown' ? (
-        <MarkdownRenderer key={`md-${index}-${segment.start ?? 'start'}`} content={segment.content} />
-      ) : (
-        <pre className="plain-text-output hybrid-text-block" key={`text-${index}-${segment.start ?? 'start'}`}>
-          {segment.content}
-        </pre>
-      )
-    )
+    items.map((segment, index) => (
+      <div
+        key={segment.key ?? `${segment.format}-${index}-${segment.start ?? 'start'}`}
+        className={`llm-chunk llmChunk ${
+          segment.format === 'markdown' ? 'llm-chunk--markdown llmChunk--markdown' : 'llm-chunk--text llmChunk--text'
+        }`}
+      >
+        {segment.format === 'markdown' ? (
+          <MarkdownRenderer content={segment.content} />
+        ) : (
+          <pre className="plain-text-output hybrid-text-block">{segment.content}</pre>
+        )}
+      </div>
+    ))
 
   return (
     <div className="streaming-demo">
@@ -347,7 +352,9 @@ export function StreamingDemo({
       )}
 
       <div
-        className={`output-area ${isPending && showIsPending ? 'pending' : ''} ${isStale && showIsStale ? 'stale' : ''}`}
+        className={`output-area ${isPending && showIsPending ? 'pending' : ''} ${
+          isStale && showIsStale ? 'stale' : ''
+        }`}
       >
         <div className="output-header">
           <div className="output-tabs">
@@ -384,7 +391,7 @@ export function StreamingDemo({
         </div>
         <div
           ref={outputContentRef}
-          className="output-content"
+          className="output-content chat-scroller"
           onScroll={handleScroll}
           style={useWindowing ? { position: 'relative' } : undefined}
         >
@@ -400,20 +407,28 @@ export function StreamingDemo({
                   }}
                 >
                   {outputTab === 'markdown' ? (
-                    <MarkdownRenderer content={windowedText} />
+                    <div className="llm-chunk llmChunk llm-chunk--markdown llmChunk--markdown">
+                      <MarkdownRenderer content={windowedText} />
+                    </div>
                   ) : outputTab === 'hybrid' ? (
                     renderHybridSegments(windowedHybridSegments)
                   ) : (
-                    <pre className="plain-text-output">{windowedText}</pre>
+                    <div className="llm-chunk llmChunk llm-chunk--text llmChunk--text">
+                      <pre className="plain-text-output">{windowedText}</pre>
+                    </div>
                   )}
                 </div>
               </div>
             ) : outputTab === 'markdown' ? (
-              <MarkdownRenderer content={displayText} />
+              <div className="llm-chunk llmChunk llm-chunk--markdown llmChunk--markdown">
+                <MarkdownRenderer content={displayText} />
+              </div>
             ) : outputTab === 'hybrid' ? (
               <div className="hybrid-output">{renderHybridSegments(mergedHybridSegments)}</div>
             ) : (
-              <pre className="plain-text-output">{displayText}</pre>
+              <div className="llm-chunk llmChunk llm-chunk--text llmChunk--text">
+                <pre className="plain-text-output">{displayText}</pre>
+              </div>
             )
           ) : (
             <p className="placeholder-text">

@@ -5,6 +5,7 @@ import { Level3Page } from './pages/Level3Page'
 import { Level4Page } from './pages/Level4Page'
 import { Level5Page } from './pages/Level5Page'
 import { Level6Page } from './pages/Level6Page'
+import { Level7Page } from './pages/Level7Page'
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="/level/4" element={<Level4Page />} />
         <Route path="/level/5" element={<Level5Page />} />
         <Route path="/level/6" element={<Level6Page />} />
+        <Route path="/level/7" element={<Level7Page />} />
       </Routes>
     </BrowserRouter>
   )
