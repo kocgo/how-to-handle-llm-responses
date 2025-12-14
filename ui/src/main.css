@@ -547,6 +547,38 @@ section blockquote {
   min-height: 200px;
   max-height: 400px;
   overflow-y: auto;
+  overflow-anchor: none;
+}
+
+.llm-chunk,
+.llmChunk {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px;
+  contain: content;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background-color: #0b162c;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.llm-chunk--markdown,
+.llmChunk--markdown {
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.03));
+}
+
+.llm-chunk--text,
+.llmChunk--text {
+  background: linear-gradient(180deg, rgba(236, 72, 153, 0.1), rgba(236, 72, 153, 0.03));
+}
+
+.llm-chunk:last-child,
+.llmChunk:last-child {
+  margin-bottom: 0;
+}
+
+.chat-scroller {
+  overflow-anchor: none;
 }
 
 .placeholder-text {

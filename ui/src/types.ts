@@ -1,5 +1,5 @@
 export type BatchStrategy = 'none' | 'raf' | 'interval'
-export type Level = 1 | 2 | 3 | 4 | 5 | 6
+export type Level = 1 | 2 | 3 | 4 | 5 | 6 | 7
 
 export interface StreamChunk {
   content: string
@@ -67,6 +67,15 @@ export const LEVEL_CONFIGS: LevelConfig[] = [
     level: 6,
     name: 'Windowed',
     description: 'Virtualized rendering',
+    batchStrategy: 'raf',
+    useTransition: true,
+    useDeferredValue: true,
+    useWindowing: true,
+  },
+  {
+    level: 7,
+    name: 'CSS Containment',
+    description: 'content-visibility + contain',
     batchStrategy: 'raf',
     useTransition: true,
     useDeferredValue: true,
