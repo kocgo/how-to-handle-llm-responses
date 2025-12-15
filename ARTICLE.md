@@ -197,3 +197,4 @@ I stumbled upon MillionJS while researching high-performance React rendering. I 
 I won't go into details about MillionJS here, but in short, it compiles React components into highly optimized vanilla JS code that manipulates the DOM directly, bypassing React's reconciliation process.
 
 And it did not help at all. Benchmarks were identical.
+

@@ -21,7 +21,6 @@ This benchmark lets you toggle various optimizations in real-time and observe th
 - **RAF Batching** - Buffer incoming chunks and batch updates per animation frame
 - **startTransition** - Mark streaming updates as non-urgent (React 18)
 - **useDeferredValue** - Defer rendering of stale content during updates
-- **Million.js Mode** - Simplified block-based rendering for maximum speed
 
 ### CSS Optimizations
 - **content-visibility: auto** - Skip rendering of off-screen content
@@ -193,7 +192,6 @@ interface BenchmarkOptions {
   // React optimizations
   useTransition: boolean;
   useDeferredValue: boolean;
-  useMillionJs: boolean;
   
   // CSS optimizations
   useContentVisibility: boolean;

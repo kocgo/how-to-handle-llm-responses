@@ -48,9 +48,6 @@ export interface BenchmarkOptions {
   
   // Performance: use lightweight markdown (skip syntax highlighting)
   useLightweightMarkdown: boolean;
-  
-  // Million.js block optimization
-  useMillionJs: boolean;
 
   // Stream parameters
   words: number;
@@ -71,7 +68,6 @@ export const DEFAULT_OPTIONS: BenchmarkOptions = {
   autoScroll: true,
   useVirtualization: false,
   useLightweightMarkdown: false,
-  useMillionJs: false,
   words: 5000,
   delay: 1,
 };
