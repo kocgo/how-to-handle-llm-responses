@@ -1,6 +1,15 @@
+// Types
 export * from './types';
-export * from './useStreaming';
-export * from './useFpsMetrics';
+
+// Hooks
+export * from './hooks';
+
+// Components
+export * from './components';
+
+// Utils
+export * from './utils';
+
+// Main components
 export { Dashboard } from './Dashboard';
-export { FpsChart } from './FpsChart';
 export { OutputRenderer } from './OutputRenderer';

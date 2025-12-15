@@ -29,27 +29,27 @@ body {
 
 .header {
   text-align: center;
-  padding: 1.5rem;
+  padding: 0.75rem;
   border-bottom: 1px solid #1e293b;
 }
 
 .header h1 {
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: #f8fafc;
-  margin: 0 0 0.25rem;
+  margin: 0 0 0.125rem;
 }
 
 .header p {
   color: #64748b;
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
 }
 
 .main {
   flex: 1;
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 240px 1fr;
   overflow: hidden;
 }
 
@@ -57,35 +57,35 @@ body {
 .controls {
   background: #1e293b;
   border-right: 1px solid #334155;
-  padding: 1.5rem;
+  padding: 1rem;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 0.75rem;
 }
 
 .control-section h2 {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 600;
   color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin: 0 0 0.75rem;
+  margin: 0 0 0.5rem;
 }
 
 /* Toggle Options */
 .toggle-option {
   display: flex;
   align-items: flex-start;
-  gap: 0.75rem;
-  padding: 0.625rem 0;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
   cursor: pointer;
 }
 
 .toggle-option input[type='checkbox'] {
   accent-color: #3b82f6;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   margin-top: 2px;
   flex-shrink: 0;
 }
@@ -93,29 +93,31 @@ body {
 .toggle-info {
   display: flex;
   flex-direction: column;
-  gap: 0.125rem;
+  gap: 0;
 }
 
 .toggle-name {
   font-weight: 500;
   color: #f8fafc;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
+  line-height: 1.2;
 }
 
 .toggle-desc {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: #64748b;
+  line-height: 1.2;
 }
 
 /* Slider Options */
 .slider-option {
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .slider-option.nested,
 .select-option.nested {
-  margin-left: 1.5rem;
-  padding-left: 0.75rem;
+  margin-left: 1rem;
+  padding-left: 0.5rem;
   border-left: 2px solid #334155;
 }
 
@@ -124,14 +126,24 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   color: #94a3b8;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
+  gap: 0.25rem;
+}
+
+.slider-header span,
+.select-header span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .slider-header strong {
   color: #f8fafc;
   font-family: 'Fira Code', monospace;
+  font-size: 0.8rem;
+  margin-left: auto;
 }
 
 .slider-option input[type='range'] {
@@ -141,18 +153,18 @@ body {
 
 /* Style Buttons */
 .select-option {
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .style-buttons {
   display: flex;
-  gap: 0.375rem;
+  gap: 0.25rem;
 }
 
 .style-btn {
   flex: 1;
-  padding: 0.375rem 0.5rem;
-  font-size: 0.75rem;
+  padding: 0.25rem 0.375rem;
+  font-size: 0.7rem;
   font-weight: 500;
   background: #0f172a;
   border: 1px solid #334155;
@@ -631,3 +643,112 @@ pre .lightweight-code {
   border-left: 3px solid #3b82f6;
   border-radius: 0 4px 4px 0;
 }
+
+/* Tooltip */
+.tooltip-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.25rem;
+}
+
+.tooltip-trigger {
+  cursor: help;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.info-icon {
+  color: #64748b;
+  transition: color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.info-icon:hover {
+  color: #94a3b8;
+}
+
+/* Portal-based tooltip (fixed positioning) */
+.tooltip-portal {
+  pointer-events: none;
+  animation: tooltipFadeIn 0.15s ease-out;
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tooltip-portal .tooltip-content {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 0.75rem;
+  font-size: 0.8rem;
+  color: #e2e8f0;
+  line-height: 1.5;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.tooltip-portal .tooltip-arrow {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+}
+
+.tooltip-portal.tooltip-top .tooltip-arrow {
+  bottom: -7px;
+  border-top: 8px solid #334155;
+}
+
+.tooltip-portal.tooltip-bottom .tooltip-arrow {
+  top: -7px;
+  border-bottom: 8px solid #334155;
+}
+
+.tooltip-content strong {
+  color: #f8fafc;
+  font-weight: 600;
+}
+
+.tooltip-content code {
+  background: #334155;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  font-family: 'Fira Code', monospace;
+  font-size: 0.75rem;
+  color: #7dd3fc;
+}
+
+.tooltip-content p {
+  margin: 0;
+}
+
+.tooltip-content p + p {
+  margin-top: 0.5rem;
+}
+
+/* Toggle option with tooltip */
+.toggle-option .toggle-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.toggle-option .toggle-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
