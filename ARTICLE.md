@@ -8,20 +8,25 @@ It just makes the application feel... cheap.
 
 But are there good examples? They feel buttery smooth; for a while, then they start to lag/stutter as well. Overall, it is getting better nowadays in all those applications I have mentioned.
 
-So I started wondering: Is 60 FPS even achievable? What about 240 FPS for those of us who are obsessive about frame rates?
+So I started wondering: Let alone failures; is 60 FPS even achievable? What about 240 FPS for those of us who are obsessive about frame rates?
 
 ## TLDR
 I built a benchmark suite to test various optimizations for streaming LLM responses in a React UI. Here are the key takeaways:
 
-1) Build a proper state first, then optimize the rendering later. Ideally, do it without React. You can use Zustand to build the whole state outside React.
+1) Build a proper state first, then optimize the rendering later. Ideally, do it without React. You can use Zustand (or whatever library that helps you to build a state and adapt to React later) to build the whole state outside React.
 
 2) Do not try to optimize React re-renders or hooks, focus on windowing.
 Wins on React internals are minimal (memoization, useTransition, useDeferredValue etc) compared to windowing.
 
-3) Focus on CRP (Critical Rendering Path) optimizations using CSS containment and content-visibility. 
+3) Focus on CRP (Critical Rendering Path) optimizations using CSS properties like `content-visibility: auto` and `contain: content`.
+
+If you are going to use animations: use `will-change` property.
 
 4) If you are designing the Chat Bot yourself, consider not responding with markdown at all. It is expensive to parse and render.
 
+And if you must, you can use segments in your LLM response to separate markdown parts from plain text parts. Render plain text parts as raw text and only parse markdown parts.
+
+5) If network speed is not an issue, consider slowing down the stream itself. A small delay between words (5-10ms) can help maintain higher FPS.
 
 ## How LLMs Stream Works
 
@@ -247,3 +252,54 @@ Min FPS: 40 (keeps dropping linearly)
 Achieved in: 180 seconds
 
 It looks like an improvement at first, but FPS keeps dropping linearly as the response grows. So not a real solution.
+
+### Windowing (Virtualization)
+
+The final and most effective optimization is windowing (or virtualization). This technique involves rendering only the visible portion of the content, rather than the entire response.
+
+Probably you were expecting this one.
+
+I have tried a few Virtualization libraries, but @tanstack/react-virtual has provided the most smooth UX (scrolling behavior etc).
+
+Lets go:
+(Raw Text + Virtualization + No Other Optimizations):
+
+Min FPS: 240 (stable)
+Achieved in: 300 seconds
+
+Okay, we got there. 240 FPS is achievable with proper windowing.
+
+Now lets push it further:
+(Raw Text + Virtualization + Text Animations + No Other Optimizations):
+
+Min FPS: 230 (stable)
+Achieved in: 300 seconds
+
+Looks much smoother with a few fps sacrifice.
+
+Now also with Markdown (segmented rendering; only markdown parts are parsed, this is the most realistic scenario):
+
+(Raw Text + Virtualization + Text Animations + Markdown + No Other Optimizations):
+
+FPS: 180 - 200 (stablish) 
+
+Now lets add optimizations like RAF batching and CSS and realistic network delay:`
+
+(Raw Text + Virtualization + Text Animations + Markdown + RAF + CSS + Realistic Network Delay 5ms):
+
+
+FPS: 200 - 235 (stable)
+
+And with lightweight markdown parsing (no syntax highlighting):
+
+FPS is 240 stable.
+
+## Conclusion
+
+After testing various optimizations for streaming LLM responses in a React UI, the key takeaway is that windowing (virtualization) is the most effective technique to achieve high FPS.
+
+It was definitely a fun experiment and I hope these findings help you build smoother apps!
+
+## Repository
+You can find the complete benchmark suite and code examples in this GitHub repository: [how-to-handle-llm-responses](
+    https://github.com/kocgo/how-to-handle-llm-responses)
