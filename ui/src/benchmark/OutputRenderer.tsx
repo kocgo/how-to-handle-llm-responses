@@ -7,6 +7,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { RenderMode, AnimationType } from './types';
 import { StreamingFadeInText } from './components';
+import { parseMixedSegments, splitIntoBlocks, ParsedSegment } from './utils/parsers';
 
 interface CssOptimizations {
   useContentVisibility: boolean;
@@ -27,116 +28,6 @@ interface OutputRendererProps {
   useMillionJs?: boolean;
 }
 
-// Cache for parsed segments to avoid re-parsing
-const segmentCache = new WeakMap<object, { content: string; segments: ParsedSegment[] }>();
-const blockCache = new WeakMap<object, { content: string; blocks: string[] }>();
-
-interface ParsedSegment {
-  type: 'text' | 'markdown';
-  content: string;
-}
-
-// Fast segment parser with caching
-function parseMixedSegments(content: string, cacheKey: object): ParsedSegment[] {
-  const cached = segmentCache.get(cacheKey);
-  if (cached && cached.content === content) {
-    return cached.segments;
-  }
-  
-  const segments: ParsedSegment[] = [];
-  const regex = /<markdown>([\s\S]*?)<\/markdown>/g;
-  let lastIndex = 0;
-  let match;
-
-  while ((match = regex.exec(content)) !== null) {
-    if (match.index > lastIndex) {
-      segments.push({ type: 'text', content: content.slice(lastIndex, match.index) });
-    }
-    segments.push({ type: 'markdown', content: match[1] });
-    lastIndex = regex.lastIndex;
-  }
-  if (lastIndex < content.length) {
-    segments.push({ type: 'text', content: content.slice(lastIndex) });
-  }
-  
-  segmentCache.set(cacheKey, { content, segments });
-  return segments;
-}
-
-// Split content into blocks for virtualization
-function splitIntoBlocks(content: string, mode: RenderMode): string[] {
-  if (!content) return [];
-  
-  if (mode === 'text') {
-    // For text mode, split by lines
-    return content.split('\n');
-  }
-  
-  if (mode === 'markdown') {
-    // For markdown, split by double newlines (paragraphs) or code blocks
-    // This preserves code blocks as single units
-    const blocks: string[] = [];
-    const codeBlockRegex = /```[\s\S]*?```/g;
-    let lastIndex = 0;
-    let match;
-    
-    // First extract code blocks
-    const segments: { type: 'code' | 'text'; content: string; start: number }[] = [];
-    while ((match = codeBlockRegex.exec(content)) !== null) {
-      if (match.index > lastIndex) {
-        segments.push({ type: 'text', content: content.slice(lastIndex, match.index), start: lastIndex });
-      }
-      segments.push({ type: 'code', content: match[0], start: match.index });
-      lastIndex = codeBlockRegex.lastIndex;
-    }
-    if (lastIndex < content.length) {
-      segments.push({ type: 'text', content: content.slice(lastIndex), start: lastIndex });
-    }
-    
-    // Now split text segments by paragraphs, keep code blocks whole
-    for (const segment of segments) {
-      if (segment.type === 'code') {
-        blocks.push(segment.content);
-      } else {
-        // Split by double newlines for paragraphs
-        const paragraphs = segment.content.split(/\n\n+/).filter(p => p.trim());
-        blocks.push(...paragraphs);
-      }
-    }
-    
-    return blocks.length > 0 ? blocks : [content];
-  }
-  
-  if (mode === 'mixed') {
-    // For mixed mode, split by <markdown> tags and then by paragraphs within each
-    const blocks: string[] = [];
-    const regex = /<markdown>([\s\S]*?)<\/markdown>/g;
-    let lastIndex = 0;
-    let match;
-    
-    while ((match = regex.exec(content)) !== null) {
-      // Text before markdown tag - split by lines
-      if (match.index > lastIndex) {
-        const textContent = content.slice(lastIndex, match.index);
-        const lines = textContent.split('\n').filter(l => l.trim());
-        blocks.push(...lines.map(l => `__TEXT__${l}`));
-      }
-      // Markdown content - keep as single block with marker
-      blocks.push(`__MARKDOWN__${match[1]}`);
-      lastIndex = regex.lastIndex;
-    }
-    // Remaining text
-    if (lastIndex < content.length) {
-      const textContent = content.slice(lastIndex);
-      const lines = textContent.split('\n').filter(l => l.trim());
-      blocks.push(...lines.map(l => `__TEXT__${l}`));
-    }
-    
-    return blocks.length > 0 ? blocks : [`__TEXT__${content}`];
-  }
-  
-  return [content];
-}
 
 // Markdown components for non-animated rendering
 const markdownComponents = {
@@ -153,6 +44,17 @@ const markdownComponents = {
       </SyntaxHighlighter>
     ) : (
       <code className={className} {...props}>
+        {children}
+      </code>
+    );
+  },
+};
+
+// Lightweight markdown components (no syntax highlighting)
+const lightweightMdComponents = {
+  code({ node, inline, className, children, ...props }: any) {
+    return (
+      <code className={`${className || ''} lightweight-code`} {...props}>
         {children}
       </code>
     );
@@ -189,17 +91,6 @@ function OutputRendererInner({
     return parseMixedSegments(content, cacheKeyRef.current);
   }, [content, renderMode, useVirtualization]);
   
-  // Lightweight markdown components (no syntax highlighting)
-  const lightweightComponents = useMemo(() => ({
-    code({ node, inline, className, children, ...props }: any) {
-      return (
-        <code className={`${className || ''} lightweight-code`} {...props}>
-          {children}
-        </code>
-      );
-    },
-  }), []);
-
   // Virtualizer with dynamic measurement
   const virtualizer = useVirtualizer({
     count: blocks.length,
@@ -282,7 +173,7 @@ function OutputRendererInner({
             } : {};
 
             // Select markdown components based on lightweight mode
-            const mdComponents = useLightweightMarkdown ? lightweightComponents : markdownComponents;
+            const mdComponents = useLightweightMarkdown ? lightweightMdComponents : markdownComponents;
 
             // Render based on mode
             let blockContent: React.ReactNode;
@@ -467,17 +358,6 @@ function OutputRendererInner({
     </div>
   );
 }
-
-// Lightweight markdown components (no syntax highlighting)
-const lightweightMdComponents = {
-  code({ node, inline, className, children, ...props }: any) {
-    return (
-      <code className={`${className || ''} lightweight-code`} {...props}>
-        {children}
-      </code>
-    );
-  },
-};
 
 // Memoized segment renderer - prevents re-rendering unchanged segments
 const MemoizedSegment = memo(function MemoizedSegment({
