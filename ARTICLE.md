@@ -13,6 +13,7 @@ Are there good examples out there? Sure, some feel smooth at first. But eventual
 So I started wondering: forget the bad ones—can we even hit 60 FPS consistently? And what about 240 FPS for us frame rate nerds?
 
 ## TL;DR
+
 I built a benchmark suite to test various optimizations for streaming LLM responses in a React UI. For those in a hurry, here are my findings:
 
 1) Build a proper state first, then optimize the rendering later. Ideally, do it without React. You can use Zustand (or whatever library that helps you to build a state and adapt to React later) to build the whole state outside React.
