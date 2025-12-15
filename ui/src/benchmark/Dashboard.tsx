@@ -81,6 +81,18 @@ export function Dashboard() {
                 <span className="toggle-desc">Defer rendering of stale content</span>
               </div>
             </label>
+
+            <label className="toggle-option">
+              <input
+                type="checkbox"
+                checked={options.useMillionJs}
+                onChange={() => toggle('useMillionJs')}
+              />
+              <div className="toggle-info">
+                <span className="toggle-name">Million.js</span>
+                <span className="toggle-desc">Block virtual DOM (70% faster)</span>
+              </div>
+            </label>
           </section>
 
           <section className="control-section">
@@ -365,6 +377,7 @@ export function Dashboard() {
               useVirtualization={options.useVirtualization}
               autoScroll={options.autoScroll}
               useLightweightMarkdown={options.useLightweightMarkdown}
+              useMillionJs={options.useMillionJs}
               cssOptimizations={{
                 useContentVisibility: options.useContentVisibility,
                 useContain: options.useContain,

@@ -24,6 +24,7 @@ interface OutputRendererProps {
   autoScroll?: boolean;
   cssOptimizations?: CssOptimizations;
   useLightweightMarkdown?: boolean;
+  useMillionJs?: boolean;
 }
 
 // Cache for parsed segments to avoid re-parsing
@@ -168,6 +169,7 @@ function OutputRendererInner({
   autoScroll = false,
   cssOptimizations,
   useLightweightMarkdown = false,
+  useMillionJs = false,
 }: OutputRendererProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [animatedBlockCount, setAnimatedBlockCount] = useState(0);
@@ -387,6 +389,22 @@ function OutputRendererInner({
         </pre>
       );
     }
+    
+    // Million.js optimization - render as single pre block
+    if (useMillionJs) {
+      return (
+        <pre 
+          className="output-text output-million" 
+          style={{
+            ...cssOptStyles,
+            margin: 0,
+          }}
+        >
+          {content}
+        </pre>
+      );
+    }
+    
     return (
       <pre className="output-text" style={cssOptStyles}>
         {content}
@@ -397,6 +415,25 @@ function OutputRendererInner({
   // Mixed mode - text with <markdown>...</markdown> segments
   // Uses memoized segments for performance
   if (renderMode === 'mixed') {
+    // Million.js mode - simplified rendering without segment parsing
+    if (useMillionJs && !animate) {
+      return (
+        <pre 
+          className="output-mixed output-million" 
+          style={{
+            ...cssOptStyles,
+            fontFamily: "'Fira Code', monospace",
+            fontSize: '0.875rem',
+            color: '#e2e8f0',
+            whiteSpace: 'pre-wrap',
+            margin: 0,
+          }}
+        >
+          {content.replace(/<\/?markdown>/g, '')}
+        </pre>
+      );
+    }
+    
     return (
       <div className="output-mixed" style={cssOptStyles}>
         {mixedSegments.map((segment, index) => (
