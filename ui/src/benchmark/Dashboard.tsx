@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { BenchmarkOptions, DEFAULT_OPTIONS, ANIMATION_TYPES, AnimationType, ScrollBehavior } from './types';
+import { BenchmarkOptions, DEFAULT_OPTIONS, ANIMATION_TYPES, AnimationType } from './types';
 import { useStreaming } from './useStreaming';
 import { useFpsMetrics } from './useFpsMetrics';
 import { FpsChart } from './FpsChart';
@@ -155,6 +155,20 @@ export function Dashboard() {
               </div>
             </div>
 
+            {(options.renderMode === 'mixed' || options.renderMode === 'markdown') && (
+              <label className="toggle-option">
+                <input
+                  type="checkbox"
+                  checked={options.useLightweightMarkdown}
+                  onChange={() => toggle('useLightweightMarkdown')}
+                />
+                <div className="toggle-info">
+                  <span className="toggle-name">Lightweight MD</span>
+                  <span className="toggle-desc">Skip syntax highlighting (faster)</span>
+                </div>
+              </label>
+            )}
+
             <label className="toggle-option">
               <input
                 type="checkbox"
@@ -257,23 +271,6 @@ export function Dashboard() {
               <span>Auto-scroll</span>
             </label>
 
-            {options.autoScroll && (
-              <div className="style-option">
-                <span>Behavior</span>
-                <div className="style-buttons">
-                  {(['smooth', 'instant'] as const).map((behavior) => (
-                    <button
-                      key={behavior}
-                      className={`style-btn ${options.scrollBehavior === behavior ? 'active' : ''}`}
-                      onClick={() => setOptions((prev) => ({ ...prev, scrollBehavior: behavior }))}
-                    >
-                      {behavior.charAt(0).toUpperCase() + behavior.slice(1)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <label className="toggle-option">
               <input
                 type="checkbox"
@@ -357,8 +354,6 @@ export function Dashboard() {
               willChange: options.useWillChange ? 'transform, opacity' : 'auto',
               // When virtualization is enabled, disable outer scroll - the virtualized container handles it
               overflow: options.useVirtualization ? 'hidden' : undefined,
-              // Use CSS scroll-behavior for smooth/instant
-              scrollBehavior: options.scrollBehavior === 'smooth' ? 'smooth' : 'auto',
             }}
           >
             <OutputRenderer
@@ -369,7 +364,7 @@ export function Dashboard() {
               animationDuration={options.animationDuration}
               useVirtualization={options.useVirtualization}
               autoScroll={options.autoScroll}
-              scrollBehavior={options.scrollBehavior}
+              useLightweightMarkdown={options.useLightweightMarkdown}
               cssOptimizations={{
                 useContentVisibility: options.useContentVisibility,
                 useContain: options.useContain,

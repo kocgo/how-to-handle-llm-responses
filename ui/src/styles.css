@@ -418,6 +418,23 @@ body {
   color: #f472b6;
 }
 
+/* Lightweight code (no syntax highlighting) */
+.lightweight-code {
+  background: #1e293b;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  font-family: 'Fira Code', monospace;
+  font-size: 0.85em;
+  color: #94a3b8;
+}
+
+pre .lightweight-code {
+  display: block;
+  padding: 1rem;
+  overflow-x: auto;
+  white-space: pre;
+}
+
 /* TextGenerateEffect output styling */
 .output-text-animate {
   font-family: 'Fira Code', monospace;
@@ -552,3 +569,65 @@ body {
 .blurAndSharpen { animation-name: blurAndSharpen; }
 .wave { animation-name: wave; }
 .typewriter { animation-name: typewriter; }
+
+/* Virtualized Markdown Block */
+.markdown-block {
+  padding: 0.25rem 0;
+}
+
+.markdown-block p {
+  margin: 0;
+}
+
+.markdown-block h1,
+.markdown-block h2,
+.markdown-block h3,
+.markdown-block h4,
+.markdown-block h5,
+.markdown-block h6 {
+  margin: 0.5rem 0;
+  color: #f8fafc;
+}
+
+.markdown-block ul,
+.markdown-block ol {
+  margin: 0.25rem 0;
+  padding-left: 1.5rem;
+}
+
+.markdown-block pre {
+  margin: 0.5rem 0;
+  border-radius: 6px;
+  overflow: auto;
+}
+
+.markdown-block code {
+  font-family: 'Fira Code', monospace;
+}
+
+.markdown-block blockquote {
+  margin: 0.5rem 0;
+  padding-left: 1rem;
+  border-left: 3px solid #3b82f6;
+  color: #94a3b8;
+}
+
+/* Virtualized Mixed Mode */
+.mixed-block {
+  padding: 0.125rem 0;
+}
+
+.mixed-block-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'Fira Code', monospace;
+  font-size: 0.875rem;
+  color: #e2e8f0;
+}
+
+.mixed-block-markdown {
+  padding: 0.5rem;
+  background: rgba(51, 65, 85, 0.3);
+  border-left: 3px solid #3b82f6;
+  border-radius: 0 4px 4px 0;
+}
