@@ -84,7 +84,7 @@ async function streamLLMResponse(url) {
 Lets take a look at why this approach can lead to lag and stuttering:
 (Raw text with React Set State approach):
 
-![Raw text with React setState](article-gifs/a-raw-text-react-setstate.gif)
+![Raw text with React setState](https://github.com/kocgo/how-to-handle-llm-responses/blob/master/article-gifs/a-raw-text-react-setstate.gif?raw=true)
 
 Result: As state (basically chat history) grows, FPS drops significantly.
 
@@ -132,7 +132,7 @@ async function streamLLMResponse(url) {
 
 Lets see how this performs:
 
-![Raw text with RAF batching](article-gifs/b-raw-text-raf.gif)
+![Raw text with RAF batching](https://github.com/kocgo/how-to-handle-llm-responses/blob/master/article-gifs/b-raw-text-raf.gif?raw=true)
 
 Min FPS: 15
 Achieved in: 90 seconds
@@ -196,7 +196,7 @@ https://dev.to/mohamad_msalme_38f2508ea2/time-slicing-in-react-how-your-ui-stays
 Lets see it in action:
 (Raw Text with RAF + startTransition):
 
-![Raw text with RAF + startTransition](article-gifs/c-raw-text-raf-transition.gif)
+![Raw text with RAF + startTransition](https://github.com/kocgo/how-to-handle-llm-responses/blob/master/article-gifs/c-raw-text-raf-transition.gif?raw=true)
 
 Min FPS: 20
 Achieved in: 90 seconds
@@ -222,7 +222,7 @@ Lets see how these optimizations perform:
 
 (Raw Text with RAF + CSS Optimizations):
 
-![Raw text with RAF + CSS optimizations](article-gifs/d-raw-text-raf-css.gif)
+![Raw text with RAF + CSS optimizations](https://github.com/kocgo/how-to-handle-llm-responses/blob/master/article-gifs/d-raw-text-raf-css.gif?raw=true)
 
 Min FPS: 20
 Achieved in: 90 seconds
@@ -257,7 +257,7 @@ async function streamLLMResponse(url) {
 Lets see how this performs:
 (Raw Text with 5ms delay between words):
 
-![Raw text with RAF + delayed stream](article-gifs/e-raw-text-raf-delayed-stream.gif)
+![Raw text with RAF + delayed stream](https://github.com/kocgo/how-to-handle-llm-responses/blob/master/article-gifs/e-raw-text-raf-delayed-stream.gif?raw=true)
 
 Min FPS: 40 (keeps dropping linearly)
 Achieved in: 180 seconds
@@ -275,7 +275,7 @@ I have tried a few Virtualization libraries, but @tanstack/react-virtual has pro
 Lets go:
 (Raw Text + Virtualization + No Other Optimizations):
 
-![Raw text with windowing](article-gifs/f-raw-text-windowing.gif)
+![Raw text with windowing](https://github.com/kocgo/how-to-handle-llm-responses/blob/master/article-gifs/f-raw-text-windowing.gif?raw=true)
 
 Min FPS: 240 (stable)
 Achieved in: 300 seconds
@@ -285,7 +285,7 @@ Okay, we got there. 240 FPS is achievable with proper windowing.
 Now lets push it further:
 (Raw Text + Virtualization + Text Animations + No Other Optimizations):
 
-![Raw text with windowing and text animation](article-gifs/g-raw-text-windowing-text-animation.gif)
+![Raw text with windowing and text animation](https://github.com/kocgo/how-to-handle-llm-responses/blob/master/article-gifs/g-raw-text-windowing-text-animation.gif?raw=true)
 
 Min FPS: 230 (stable)
 Achieved in: 300 seconds
@@ -296,7 +296,7 @@ Now also with Markdown (segmented rendering; only markdown parts are parsed, thi
 
 (Raw Text + Virtualization + Text Animations + Markdown + No Other Optimizations):
 
-![Raw text with windowing, text animation, and markdown](article-gifs/h-raw-text-windowing-text-animation-markdown.gif)
+![Raw text with windowing, text animation, and markdown](https://github.com/kocgo/how-to-handle-llm-responses/blob/master/article-gifs/h-raw-text-windowing-text-animation-markdown.gif?raw=true)
 
 FPS: 180 - 200 (stablish) 
 
@@ -304,7 +304,7 @@ Now lets add optimizations like RAF batching and CSS and realistic network delay
 
 (Raw Text + Virtualization + Text Animations + Markdown + RAF + CSS + Realistic Network Delay 5ms):
 
-![Raw text with windowing, text animation, markdown, and optimizations](article-gifs/i-raw-text-windowing-text-animation-markdown-optimized.gif)
+![Raw text with windowing, text animation, markdown, and optimizations](https://github.com/kocgo/how-to-handle-llm-responses/blob/master/article-gifs/i-raw-text-windowing-text-animation-markdown-optimized.gif?raw=true)
 
 FPS: 200 - 235 (stable)
 
