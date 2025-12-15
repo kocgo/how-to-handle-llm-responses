@@ -1,17 +1,19 @@
-# Chasing 240 FPS on LLM Chats
+# Chasing 240 FPS in LLM Chat UIs
 
-I have been using LLM chat applications and dev assistant tools for a while now (ChatGPT, Claude, Copilot, Cline, RooCode, Cursor etc) and developing a few and I noticed something: some of them lag on Chat UI components. 
+I've been using LLM chat apps for a while now; ChatGPT, Claude, Copilot, Cline, RooCode, Cursor (you name it) and I've built a few myself. 
 
-After a point in chat; cursor starts stuttering, scrolling feels sluggish, and user inputs get blocked or delayed, sometimes even crashing the entire tab.
+One thing I've noticed: a lot of them start to lag after a while.
 
-It just makes the application feel... cheap.
+You know the feeling. The conversation gets long, and suddenly the cursor stutters, scrolling gets choppy, typing feels delayed. Sometimes the whole tab just crashes.
 
-But are there good examples? They feel buttery smooth; for a while, then they start to lag/stutter as well. Overall, it is getting better nowadays in all those applications I have mentioned.
+It makes the app feel... cheap.
 
-So I started wondering: Let alone failures; is 60 FPS even achievable? What about 240 FPS for those of us who are obsessive about frame rates?
+Are there good examples out there? Sure, some feel smooth at first. But eventually, they all start to struggle. To be fair, things are getting better across the board.
 
-## TLDR
-I built a benchmark suite to test various optimizations for streaming LLM responses in a React UI. Here are the key takeaways:
+So I started wondering: forget the bad ones—can we even hit 60 FPS consistently? And what about 240 FPS for us frame rate nerds?
+
+## TL;DR
+I built a benchmark suite to test various optimizations for streaming LLM responses in a React UI. For those in a hurry, here are my findings:
 
 1) Build a proper state first, then optimize the rendering later. Ideally, do it without React. You can use Zustand (or whatever library that helps you to build a state and adapt to React later) to build the whole state outside React.
 
