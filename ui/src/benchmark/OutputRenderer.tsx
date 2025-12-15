@@ -147,7 +147,8 @@ function OutputRendererInner({
         style={{
           ...cssOptStyles,
           height: '100%',
-          overflow: 'auto',
+          overflowY: 'auto',
+          overflowX: 'hidden',
           padding: '1rem',
         }}
       >

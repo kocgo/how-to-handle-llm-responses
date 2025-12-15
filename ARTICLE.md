@@ -125,7 +125,7 @@ async function streamLLMResponse(url) {
 Lets see how this performs:
 
 Min FPS: 15
-Achieved in: 180 seconds
+Achieved in: 90 seconds
 
 A bit better. Still far from great. Lets move on.
 
@@ -187,7 +187,7 @@ Lets see it in action:
 (Raw Text with RAF + startTransition):
 
 Min FPS: 20
-Achieved in: 180 seconds
+Achieved in: 90 seconds
 
 Another disappointment. Lets move on.
 
@@ -198,3 +198,52 @@ I won't go into details about MillionJS here, but in short, it compiles React co
 
 And it did not help at all. Benchmarks were identical.
 
+### CSS Optimizations
+
+Finally, we come to CSS optimizations. These are not React-specific, but they can have impact on rendering performance.
+
+1) `content-visibility: auto` - This CSS property allows the browser to skip rendering elements that are off-screen.
+
+2) `contain: content` - This property tells the browser that the element's layout and paint are independent of the rest of the page. This can help reduce layout thrashing.
+
+Lets see how these optimizations perform:
+
+(Raw Text with RAF + CSS Optimizations):
+
+Min FPS: 20
+Achieved in: 90 seconds
+
+Again...nothing significant.
+
+### Delaying the stream
+One last test: what if we slow down the stream itself? Instead of sending words as fast as possible, we introduce a small delay between words.
+
+This can be achieved via a simple RxJs on UI side or a handmade function:
+
+```typescript
+// ui
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+async function streamLLMResponse(url) {
+  const response = await fetch(url);
+  const reader = response.body.getReader();
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    
+    const chunk = new TextDecoder().decode(value);
+    setResponse((prev) => prev + chunk); // Update state with each chunk
+
+    await delay(5); // Introduce a 5ms delay between chunks
+  }
+}
+```
+Lets see how this performs:
+(Raw Text with 5ms delay between words):
+
+Min FPS: 40 (keeps dropping linearly)
+Achieved in: 180 seconds
+
+It looks like an improvement at first, but FPS keeps dropping linearly as the response grows. So not a real solution.
