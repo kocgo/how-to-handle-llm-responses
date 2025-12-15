@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { BenchmarkOptions, DEFAULT_OPTIONS, ANIMATION_TYPES, AnimationType } from './types';
+import { BenchmarkOptions, DEFAULT_OPTIONS, ANIMATION_TYPES, AnimationType, ScrollBehavior } from './types';
 import { useStreaming } from './useStreaming';
 import { useFpsMetrics } from './useFpsMetrics';
 import { FpsChart } from './FpsChart';
@@ -13,12 +13,12 @@ export function Dashboard() {
   const streaming = useStreaming(options);
   const fps = useFpsMetrics(streaming.isStreaming);
 
-  // Auto-scroll
+  // Auto-scroll (only when not using virtualization - virtualization handles its own scroll)
   useEffect(() => {
-    if (outputRef.current) {
+    if (options.autoScroll && !options.useVirtualization && outputRef.current) {
       outputRef.current.scrollTop = outputRef.current.scrollHeight;
     }
-  }, [streaming.displayText]);
+  }, [streaming.displayText, options.autoScroll, options.useVirtualization]);
 
   const toggle = (key: keyof BenchmarkOptions) => {
     setOptions((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -163,7 +163,7 @@ export function Dashboard() {
               />
               <div className="toggle-info">
                 <span className="toggle-name">Animate</span>
-                <span className="toggle-desc">Smooth word-by-word animation (FlowToken)</span>
+                <span className="toggle-desc">Smooth word-by-word animation</span>
               </div>
             </label>
 
@@ -245,6 +245,45 @@ export function Dashboard() {
             </div>
           </section>
 
+          <section className="control-section">
+            <h2>Scroll</h2>
+            
+            <label className="toggle-option">
+              <input
+                type="checkbox"
+                checked={options.autoScroll}
+                onChange={(e) => setOptions((prev) => ({ ...prev, autoScroll: e.target.checked }))}
+              />
+              <span>Auto-scroll</span>
+            </label>
+
+            {options.autoScroll && (
+              <div className="style-option">
+                <span>Behavior</span>
+                <div className="style-buttons">
+                  {(['smooth', 'instant'] as const).map((behavior) => (
+                    <button
+                      key={behavior}
+                      className={`style-btn ${options.scrollBehavior === behavior ? 'active' : ''}`}
+                      onClick={() => setOptions((prev) => ({ ...prev, scrollBehavior: behavior }))}
+                    >
+                      {behavior.charAt(0).toUpperCase() + behavior.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <label className="toggle-option">
+              <input
+                type="checkbox"
+                checked={options.useVirtualization}
+                onChange={() => toggle('useVirtualization')}
+              />
+              <span>Virtualize (TanStack)</span>
+            </label>
+          </section>
+
           <div className="control-actions">
             <button
               className="btn btn-primary"
@@ -316,6 +355,10 @@ export function Dashboard() {
               contentVisibility: options.useContentVisibility ? 'auto' : 'visible',
               contain: options.useContain ? 'content' : 'none',
               willChange: options.useWillChange ? 'transform, opacity' : 'auto',
+              // When virtualization is enabled, disable outer scroll - the virtualized container handles it
+              overflow: options.useVirtualization ? 'hidden' : undefined,
+              // Use CSS scroll-behavior for smooth/instant
+              scrollBehavior: options.scrollBehavior === 'smooth' ? 'smooth' : 'auto',
             }}
           >
             <OutputRenderer
@@ -324,6 +367,9 @@ export function Dashboard() {
               animate={options.animate}
               animationType={options.animationType}
               animationDuration={options.animationDuration}
+              useVirtualization={options.useVirtualization}
+              autoScroll={options.autoScroll}
+              scrollBehavior={options.scrollBehavior}
               cssOptimizations={{
                 useContentVisibility: options.useContentVisibility,
                 useContain: options.useContain,

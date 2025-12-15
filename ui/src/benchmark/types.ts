@@ -19,6 +19,8 @@ export type AnimationType =
   | 'slideUp'
   | 'wave';
 
+export type ScrollBehavior = 'smooth' | 'instant';
+
 export interface BenchmarkOptions {
   // Batching strategy
   useRafBatching: boolean;
@@ -40,6 +42,13 @@ export interface BenchmarkOptions {
   animationType: AnimationType;
   animationDuration: string; // e.g. "0.5s"
 
+  // Auto-scroll
+  autoScroll: boolean;
+  scrollBehavior: ScrollBehavior;
+
+  // Virtualization
+  useVirtualization: boolean;
+
   // Stream parameters
   words: number;
   delay: number;
@@ -56,6 +65,9 @@ export const DEFAULT_OPTIONS: BenchmarkOptions = {
   animate: false,
   animationType: 'fadeIn',
   animationDuration: '0.5s',
+  autoScroll: true,
+  scrollBehavior: 'smooth',
+  useVirtualization: false,
   words: 5000,
   delay: 1,
 };

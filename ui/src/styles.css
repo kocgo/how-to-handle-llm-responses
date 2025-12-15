@@ -360,6 +360,28 @@ body {
   color: #e2e8f0;
 }
 
+/* Mixed mode */
+.output-mixed {
+  font-size: 0.9rem;
+}
+
+.output-text-segment {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'Fira Code', monospace;
+  font-size: 0.875rem;
+  color: #e2e8f0;
+}
+
+.output-markdown-segment {
+  margin: 0.5rem 0;
+  padding: 0.75rem;
+  background: rgba(51, 65, 85, 0.3);
+  border-left: 3px solid #3b82f6;
+  border-radius: 0 4px 4px 0;
+}
+
 .output-markdown {
   font-size: 0.9rem;
 }
@@ -441,3 +463,92 @@ body {
     max-height: 40vh;
   }
 }
+
+/* FlowToken Animation Keyframes (fallback) */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes blurIn {
+  from { opacity: 0; filter: blur(10px); }
+  to { opacity: 1; filter: blur(0); }
+}
+
+@keyframes dropIn {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInFromLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeAndScale {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes rotateIn {
+  from { opacity: 0; transform: rotate(-10deg); }
+  to { opacity: 1; transform: rotate(0); }
+}
+
+@keyframes bounceIn {
+  0% { opacity: 0; transform: scale(0.3); }
+  50% { transform: scale(1.05); }
+  70% { transform: scale(0.9); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes elastic {
+  0% { opacity: 0; transform: scale(0); }
+  55% { transform: scale(1.1); }
+  70% { transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes highlight {
+  0% { background-color: rgba(59, 130, 246, 0.5); }
+  100% { background-color: transparent; }
+}
+
+@keyframes blurAndSharpen {
+  0% { opacity: 0; filter: blur(20px); }
+  50% { filter: blur(5px); }
+  100% { opacity: 1; filter: blur(0); }
+}
+
+@keyframes wave {
+  0% { transform: translateY(0); }
+  25% { transform: translateY(-5px); }
+  50% { transform: translateY(0); }
+  75% { transform: translateY(5px); }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes typewriter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Animation Classes */
+.fadeIn { animation-name: fadeIn; }
+.blurIn { animation-name: blurIn; }
+.dropIn { animation-name: dropIn; }
+.slideInFromLeft { animation-name: slideInFromLeft; }
+.slideUp { animation-name: slideUp; }
+.fadeAndScale { animation-name: fadeAndScale; }
+.rotateIn { animation-name: rotateIn; }
+.bounceIn { animation-name: bounceIn; }
+.elastic { animation-name: elastic; }
+.highlight { animation-name: highlight; }
+.blurAndSharpen { animation-name: blurAndSharpen; }
+.wave { animation-name: wave; }
+.typewriter { animation-name: typewriter; }
