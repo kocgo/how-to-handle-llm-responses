@@ -28,13 +28,13 @@ And if you must, you can use segments in your LLM response to separate markdown 
 
 5) If network speed is not an issue, consider slowing down the stream itself. A small delay between words (5-10ms) can help maintain higher FPS.
 
-## How LLMs Stream Works
+## How LLM Streaming Works
 
 Before diving into optimizations, let's understand what we're dealing with. LLMs don't return a complete response in one shot—they stream it in chunks using Server-Sent Events (SSE).
 
-Do not ask me why, ChatGPT started it.
+Don't ask me why, ChatGPT started it.
 
-Lets take a look at the most basic LLM Stream response handling with `fetch`:
+Let's take a look at the most basic LLM Stream response handling with `fetch`:
 
 ```javascript
 async function streamLLMResponse(url) {
@@ -81,7 +81,7 @@ async function streamLLMResponse(url) {
 Lets take a look at why this approach can lead to lag and stuttering:
 (Raw text with React Set State approach):
 
-// GIF will come here
+![Raw text with React setState](article-gifs/a-raw-text-react-setstate.gif)
 
 Result: As state (basically chat history) grows, FPS drops significantly.
 
@@ -128,6 +128,8 @@ async function streamLLMResponse(url) {
 ```
 
 Lets see how this performs:
+
+![Raw text with RAF batching](article-gifs/b-raw-text-raf.gif)
 
 Min FPS: 15
 Achieved in: 90 seconds
@@ -191,6 +193,8 @@ https://dev.to/mohamad_msalme_38f2508ea2/time-slicing-in-react-how-your-ui-stays
 Lets see it in action:
 (Raw Text with RAF + startTransition):
 
+![Raw text with RAF + startTransition](article-gifs/c-raw-text-raf-transition.gif)
+
 Min FPS: 20
 Achieved in: 90 seconds
 
@@ -214,6 +218,8 @@ Finally, we come to CSS optimizations. These are not React-specific, but they ca
 Lets see how these optimizations perform:
 
 (Raw Text with RAF + CSS Optimizations):
+
+![Raw text with RAF + CSS optimizations](article-gifs/d-raw-text-raf-css.gif)
 
 Min FPS: 20
 Achieved in: 90 seconds
@@ -248,6 +254,8 @@ async function streamLLMResponse(url) {
 Lets see how this performs:
 (Raw Text with 5ms delay between words):
 
+![Raw text with RAF + delayed stream](article-gifs/e-raw-text-raf-delayed-stream.gif)
+
 Min FPS: 40 (keeps dropping linearly)
 Achieved in: 180 seconds
 
@@ -264,6 +272,8 @@ I have tried a few Virtualization libraries, but @tanstack/react-virtual has pro
 Lets go:
 (Raw Text + Virtualization + No Other Optimizations):
 
+![Raw text with windowing](article-gifs/f-raw-text-windowing.gif)
+
 Min FPS: 240 (stable)
 Achieved in: 300 seconds
 
@@ -271,6 +281,8 @@ Okay, we got there. 240 FPS is achievable with proper windowing.
 
 Now lets push it further:
 (Raw Text + Virtualization + Text Animations + No Other Optimizations):
+
+![Raw text with windowing and text animation](article-gifs/g-raw-text-windowing-text-animation.gif)
 
 Min FPS: 230 (stable)
 Achieved in: 300 seconds
@@ -281,12 +293,15 @@ Now also with Markdown (segmented rendering; only markdown parts are parsed, thi
 
 (Raw Text + Virtualization + Text Animations + Markdown + No Other Optimizations):
 
+![Raw text with windowing, text animation, and markdown](article-gifs/h-raw-text-windowing-text-animation-markdown.gif)
+
 FPS: 180 - 200 (stablish) 
 
-Now lets add optimizations like RAF batching and CSS and realistic network delay:`
+Now lets add optimizations like RAF batching and CSS and realistic network delay:
 
 (Raw Text + Virtualization + Text Animations + Markdown + RAF + CSS + Realistic Network Delay 5ms):
 
+![Raw text with windowing, text animation, markdown, and optimizations](article-gifs/i-raw-text-windowing-text-animation-markdown-optimized.gif)
 
 FPS: 200 - 235 (stable)
 
@@ -296,7 +311,7 @@ FPS is 240 stable.
 
 ## Conclusion
 
-After testing various optimizations for streaming LLM responses in a React UI, the key takeaway is that windowing (virtualization) is the most effective technique to achieve high FPS.
+After testing various optimizations for streaming LLM responses in a React UI, the key takeaway is that windowing (virtualization) is the most effective/useful technique to achieve high FPS. It has some trade-offs (complexity, memory usage and find functionality; ctrl+f) but the performance gains are significant.
 
 It was definitely a fun experiment and I hope these findings help you build smoother apps!
 
